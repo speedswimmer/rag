@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/rag
-EnvironmentFile=/home/pi/rag/.env
-ExecStart=/home/pi/rag/venv/bin/gunicorn \
+User=jarvis
+WorkingDirectory=/home/jarvis/rag
+EnvironmentFile=/home/jarvis/rag/.env
+ExecStart=/home/jarvis/rag/venv/bin/gunicorn \
     --workers 2 \
     --threads 2 \
     --timeout 120 \

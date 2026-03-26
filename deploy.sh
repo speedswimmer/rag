@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/speedswimmer/rag.git"
-APP_DIR="/home/pi/rag"
+APP_DIR="/home/jarvis/rag"
 SERVICE_NAME="rag-web"
 
 echo "=== RAG Deploy Script ==="
@@ -36,7 +36,7 @@ if [ ! -f .env ]; then
     cp .env.example .env
     echo ""
     echo "  ATTENTION: .env was created from .env.example"
-    echo "  Edit /home/pi/rag/.env and set ANTHROPIC_API_KEY before starting!"
+    echo "  Edit /home/jarvis/rag/.env and set ANTHROPIC_API_KEY before starting!"
     echo ""
 else
     if ! grep -q "^ANTHROPIC_API_KEY=sk-" .env; then
