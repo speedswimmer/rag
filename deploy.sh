@@ -20,12 +20,15 @@ fi
 cd "$APP_DIR"
 
 # 2. Create/update Python venv
-echo "[2/5] Setting up Python environment..."
+echo "[2/5] Setting up Python environment (this can take 10-20 minutes on first run)..."
 if [ ! -d venv ]; then
+    echo "      Creating virtual environment..."
     python3 -m venv venv
 fi
-venv/bin/pip install --upgrade pip --quiet
-venv/bin/pip install -r requirements.txt --quiet
+echo "      Upgrading pip..."
+venv/bin/pip install --upgrade pip
+echo "      Installing packages (chromadb + sentence-transformers take the longest)..."
+venv/bin/pip install -r requirements.txt
 
 # 3. Check .env
 echo "[3/5] Checking configuration..."
