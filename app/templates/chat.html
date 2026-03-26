@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Chat — RAG System{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+  <div class="chat-messages" id="chatMessages">
+    <div class="message message-system">
+      <div class="message-bubble">
+        Willkommen! Stelle eine Frage zu deinen Dokumenten.
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <form id="chatForm" class="chat-form">
+      <textarea
+        id="questionInput"
+        class="chat-input"
+        placeholder="Deine Frage …"
+        rows="1"
+        autofocus
+      ></textarea>
+      <button type="submit" class="chat-send-btn" id="sendBtn">
+        <span class="btn-text">Senden</span>
+        <span class="btn-spinner hidden" aria-hidden="true"></span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='chat.js') }}"></script>
+{% endblock %}

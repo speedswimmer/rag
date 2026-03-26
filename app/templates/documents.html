@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Dokumente — RAG System{% endblock %}
+
+{% block content %}
+<div class="docs-container">
+  <h1 class="page-title">Dokumente</h1>
+
+  <!-- Upload area -->
+  <section class="upload-section">
+    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">&#128196;</div>
+        <p class="dropzone-text">PDF oder TXT-Dateien hier ablegen</p>
+        <p class="dropzone-sub">oder</p>
+        <label class="file-label">
+          Dateien auswählen
+          <input type="file" name="files" id="fileInput" multiple accept=".pdf,.txt" class="file-input-hidden">
+        </label>
+        <p class="dropzone-selected" id="selectedFiles"></p>
+      </div>
+      <button type="submit" class="upload-btn" id="uploadBtn">
+        Hochladen &amp; Indizieren
+      </button>
+    </form>
+  </section>
+
+  <!-- Document table -->
+  <section class="docs-section">
+    <h2 class="section-title">Indizierte Dokumente ({{ documents | length }})</h2>
+    {% if documents %}
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Größe</th>
+            <th>Zuletzt geändert</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td class="doc-name">{{ doc.name }}</td>
+            <td class="doc-size">{{ (doc.size / 1024) | round(1) }} KB</td>
+            <td class="doc-mtime">{{ doc.mtime | int | timestamp_to_str }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty-hint">Noch keine Dokumente vorhanden. Lade eine Datei hoch.</p>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+  // Drag-and-drop and file-selection feedback
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const selectedFiles = document.getElementById('selectedFiles');
+  const uploadBtn = document.getElementById('uploadBtn');
+
+  function showSelectedFiles(files) {
+    if (files.length === 0) {
+      selectedFiles.textContent = '';
+    } else if (files.length === 1) {
+      selectedFiles.textContent = files[0].name;
+    } else {
+      selectedFiles.textContent = files.length + ' Dateien ausgewählt';
+    }
+  }
+
+  fileInput.addEventListener('change', () => showSelectedFiles(fileInput.files));
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    const dt = e.dataTransfer;
+    if (dt.files.length) {
+      fileInput.files = dt.files;
+      showSelectedFiles(dt.files);
+    }
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', () => {
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Wird verarbeitet …';
+  });
+</script>
+{% endblock %}

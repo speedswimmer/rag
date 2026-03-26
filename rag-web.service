@@ -1,0 +1,22 @@
+[Unit]
+Description=RAG Web Application
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/rag
+EnvironmentFile=/home/pi/rag/.env
+ExecStart=/home/pi/rag/venv/bin/gunicorn \
+    --workers 2 \
+    --threads 2 \
+    --timeout 120 \
+    --bind 0.0.0.0:8080 \
+    --access-logfile - \
+    --error-logfile - \
+    wsgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
