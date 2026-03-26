@@ -8,8 +8,8 @@ User=jarvis
 WorkingDirectory=/home/jarvis/rag
 EnvironmentFile=/home/jarvis/rag/.env
 ExecStart=/home/jarvis/rag/venv/bin/gunicorn \
-    --workers 2 \
-    --threads 2 \
+    --workers 1 \
+    --threads 4 \
     --timeout 120 \
     --bind 0.0.0.0:8080 \
     --access-logfile - \

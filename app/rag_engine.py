@@ -82,8 +82,12 @@ class RAGEngine:
             {"answer": str, "sources": [{"source": str, "page": int|str}]}
         """
         if self._qa_chain is None:
+            # ChromaDB may have been populated since startup — try again
+            self._try_load_existing_index()
+
+        if self._qa_chain is None:
             return {
-                "answer": "Das System ist noch nicht bereit. Bitte lade zuerst Dokumente hoch.",
+                "answer": "Noch keine Dokumente indiziert. Bitte lade zuerst ein Dokument hoch.",
                 "sources": [],
             }
 
@@ -104,6 +108,21 @@ class RAGEngine:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _try_load_existing_index(self) -> None:
+        """Try to open ChromaDB from disk if it was populated after startup."""
+        try:
+            import chromadb
+            client = chromadb.PersistentClient(path=str(self.config.chroma_dir))
+            if client.list_collections():
+                self._vectorstore = Chroma(
+                    persist_directory=str(self.config.chroma_dir),
+                    embedding_function=self._embeddings,
+                )
+                self._build_chain()
+                logger.info("Lazy-loaded ChromaDB index")
+        except Exception as exc:
+            logger.warning("Could not lazy-load index: %s", exc)
 
     def _load_documents(self) -> list:
         docs = []
