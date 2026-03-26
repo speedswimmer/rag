@@ -87,7 +87,11 @@ class RAGEngine:
                 "sources": [],
             }
 
-        result = self._qa_chain.invoke({"query": question})
+        try:
+            result = self._qa_chain.invoke({"query": question})
+        except Exception as exc:
+            return {"answer": _friendly_api_error(exc), "sources": []}
+
         sources = []
         for doc in result.get("source_documents", []):
             sources.append({
@@ -154,3 +158,26 @@ class RAGEngine:
             return_source_documents=True,
         )
         logger.info("RetrievalQA chain built")
+
+
+def _friendly_api_error(exc: Exception) -> str:
+    """Convert Anthropic API exceptions into readable German messages."""
+    msg = str(exc).lower()
+    if "credit" in msg or "billing" in msg or "balance" in msg or "402" in msg:
+        return (
+            "Dein Anthropic-Guthaben ist aufgebraucht. "
+            "Bitte lade unter console.anthropic.com neues Guthaben auf."
+        )
+    if "401" in msg or "authentication" in msg or "api_key" in msg:
+        return (
+            "Der API-Key ist ungültig oder fehlt. "
+            "Bitte prüfe den ANTHROPIC_API_KEY in der .env-Datei."
+        )
+    if "429" in msg or "rate" in msg:
+        return "Zu viele Anfragen — bitte kurz warten und erneut versuchen."
+    if "timeout" in msg or "timed out" in msg:
+        return "Die Anfrage hat zu lange gedauert. Bitte nochmal versuchen."
+    if "overloaded" in msg or "529" in msg:
+        return "Die Anthropic-API ist gerade überlastet. Bitte in einer Minute erneut versuchen."
+    logger.exception("Unhandled API error")
+    return f"Ein unerwarteter Fehler ist aufgetreten: {exc}"
