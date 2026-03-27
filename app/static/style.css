@@ -184,9 +184,14 @@ html, body {
   padding: 1.75rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: .4rem;
   scroll-behavior: smooth;
 }
+
+/* Extra space before each new user question to visually group Q+A pairs */
+.message-user { margin-top: 1.25rem; }
+.message-user:first-child,
+.message-system:first-child + .message-user { margin-top: 0; }
 
 .message { display: flex; }
 .message-user { justify-content: flex-end; }
