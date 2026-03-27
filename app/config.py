@@ -1,10 +1,13 @@
 """Central configuration — loaded from environment / .env file."""
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -55,6 +58,9 @@ class Config:
 
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.chroma_dir.mkdir(parents=True, exist_ok=True)
+
+        if self.secret_key == "change-me-in-production":
+            logger.warning("SECRET_KEY ist nicht gesetzt — bitte in der .env-Datei konfigurieren")
 
     def allowed_file(self, filename: str) -> bool:
         return (

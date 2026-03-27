@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
+from urllib.parse import unquote
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
 from werkzeug.utils import secure_filename
@@ -28,6 +29,7 @@ documents_bp = Blueprint("documents", __name__)
 
 _status_lock = threading.Lock()
 _index_status: dict = {"state": "idle", "message": ""}
+_index_build_lock = threading.Lock()  # prevents concurrent rebuilds
 
 
 def _set_status(state: str, message: str) -> None:
@@ -43,15 +45,20 @@ def _get_status() -> dict:
 
 def _run_index_in_background() -> None:
     """Rebuild index in a daemon thread. Called after files are saved."""
+    if not _index_build_lock.acquire(blocking=False):
+        logger.info("Index rebuild already running — skipping concurrent request")
+        return
     try:
         _set_status("running", "Index wird aufgebaut …")
         get_rag_engine().rebuild_index()
         get_index_manager().update_meta()
         _set_status("done", "Index aktualisiert")
         logger.info("Background index rebuild complete")
-    except Exception as exc:
+    except Exception:
         logger.exception("Background index rebuild failed")
-        _set_status("error", f"Indexierung fehlgeschlagen: {exc}")
+        _set_status("error", "Indexierung fehlgeschlagen")
+    finally:
+        _index_build_lock.release()
 
 
 # ------------------------------------------------------------------
@@ -74,7 +81,7 @@ def index_status():
 def delete_document(filename: str):
     cfg = current_app.config["RAG_CONFIG"]
 
-    safe_name = secure_filename(filename)
+    safe_name = secure_filename(unquote(filename))
     if not safe_name or not cfg.allowed_file(safe_name):
         return jsonify({"error": "Ungültiger Dateiname"}), 400
 
@@ -90,8 +97,7 @@ def delete_document(filename: str):
     target.unlink()
     logger.info("Deleted: %s", safe_name)
 
-    if _get_status()["state"] != "running":
-        threading.Thread(target=_run_index_in_background, daemon=True).start()
+    threading.Thread(target=_run_index_in_background, daemon=True).start()
 
     return jsonify({"ok": True})
 
@@ -139,8 +145,7 @@ def upload():
         else:
             yield _sse("done", f"{len(saved)} Datei(en) gespeichert — Indexierung läuft im Hintergrund …")
 
-        if _get_status()["state"] != "running":
-            threading.Thread(target=_run_index_in_background, daemon=True).start()
+        threading.Thread(target=_run_index_in_background, daemon=True).start()
 
     return Response(
         stream_with_context(generate()),

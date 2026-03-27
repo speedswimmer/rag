@@ -300,5 +300,5 @@ def _friendly_api_error(exc: Exception) -> str:
         return "Die Anfrage hat zu lange gedauert. Bitte nochmal versuchen."
     if "overloaded" in msg or "529" in msg:
         return "Die Anthropic-API ist gerade überlastet. Bitte in einer Minute erneut versuchen."
-    logger.exception("Unhandled API error")
-    return f"Ein unerwarteter Fehler ist aufgetreten: {exc}"
+    logger.exception("Unhandled API error: %s", exc)
+    return "Ein unerwarteter Fehler ist aufgetreten. Bitte erneut versuchen."

@@ -9,6 +9,7 @@ const sendBtn       = document.getElementById('sendBtn');
 const charCounter   = document.getElementById('charCounter');
 const STORAGE_KEY   = 'rag_chat_history';
 const MAX_LENGTH    = 2000;
+const CSRF_TOKEN    = document.querySelector('meta[name="csrf-token"]').content;
 
 // ------------------------------------------------------------------
 // Session history
@@ -146,7 +147,10 @@ chatForm.addEventListener('submit', async (e) => {
   try {
     const resp = await fetch('/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN,
+      },
       body: JSON.stringify({ question }),
     });
 

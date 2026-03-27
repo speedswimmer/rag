@@ -106,6 +106,8 @@
   // ----------------------------------------------------------------
   // Upload with SSE progress stream
   // ----------------------------------------------------------------
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
   document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!fileInput.files.length) return;
@@ -114,7 +116,11 @@
     setStatus('info', 'Verbindung wird hergestellt …');
 
     try {
-      const resp = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
+      const resp = await fetch('/upload', {
+        method: 'POST',
+        body: new FormData(e.target),
+        headers: { 'X-CSRFToken': csrfToken },
+      });
       if (!resp.ok) { setStatus('error', 'Server-Fehler beim Upload'); uploadBtn.disabled = false; return; }
 
       const reader = resp.body.getReader();
@@ -185,6 +191,7 @@
     try {
       const resp = await fetch(`/documents/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
+        headers: { 'X-CSRFToken': csrfToken },
       });
       const data = await resp.json();
 

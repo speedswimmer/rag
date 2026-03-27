@@ -32,8 +32,8 @@ def ask():
     logger.info("Question received: %s", question[:80])
     try:
         result = get_rag_engine().ask(question)
-    except Exception as exc:
+    except Exception:
         logger.exception("Error during RAG query")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen."}), 500
 
     return jsonify(result)

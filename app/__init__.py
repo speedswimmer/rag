@@ -4,6 +4,9 @@ import logging
 import os
 
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
+
+_csrf = CSRFProtect()
 
 from app.config import Config
 from app.indexer import IndexManager
@@ -37,6 +40,9 @@ def create_app(config: Config | None = None) -> Flask:
     app.config["RAG_CONFIG"] = cfg
     app.config["SECRET_KEY"] = cfg.secret_key
     app.config["MAX_CONTENT_LENGTH"] = cfg.max_content_length
+    app.config["WTF_CSRF_TIME_LIMIT"] = None  # Token läuft nicht ab (kein Login)
+
+    _csrf.init_app(app)
 
     if not os.getenv("ANTHROPIC_API_KEY"):
         logger.error("ANTHROPIC_API_KEY is not set — LLM calls will fail")
