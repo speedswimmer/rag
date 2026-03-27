@@ -13,13 +13,16 @@
 
   <div class="chat-input-area">
     <form id="chatForm" class="chat-form">
-      <textarea
-        id="questionInput"
-        class="chat-input"
-        placeholder="Deine Frage …"
-        rows="3"
-        autofocus
-      ></textarea>
+      <div class="chat-input-wrapper">
+        <textarea
+          id="questionInput"
+          class="chat-input"
+          placeholder="Deine Frage …"
+          rows="3"
+          autofocus
+        ></textarea>
+        <span class="char-counter" id="charCounter">0 / 2000</span>
+      </div>
       <button type="submit" class="chat-send-btn" id="sendBtn" title="Senden (Enter)">
         <span class="btn-text">
           <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

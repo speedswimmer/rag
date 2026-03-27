@@ -281,12 +281,17 @@ html, body {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.chat-input {
+.chat-input-wrapper {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-input {
   background: transparent;
   border: none;
   color: var(--text);
-  padding: .5rem 0;
+  padding: .5rem 0 .2rem;
   font-size: .95rem;
   font-family: inherit;
   resize: none;
@@ -297,6 +302,18 @@ html, body {
 }
 
 .chat-input::placeholder { color: var(--text-dim); }
+
+.char-counter {
+  font-size: .75rem;
+  color: var(--text-dim);
+  text-align: right;
+  padding-bottom: .3rem;
+  transition: color var(--transition);
+  line-height: 1;
+}
+
+.char-counter.warn  { color: #f59e0b; }
+.char-counter.limit { color: var(--error); }
 
 .chat-send-btn {
   background: var(--accent);

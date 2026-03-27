@@ -2,11 +2,13 @@
 
 'use strict';
 
-const chatMessages = document.getElementById('chatMessages');
-const chatForm     = document.getElementById('chatForm');
+const chatMessages  = document.getElementById('chatMessages');
+const chatForm      = document.getElementById('chatForm');
 const questionInput = document.getElementById('questionInput');
-const sendBtn      = document.getElementById('sendBtn');
-const STORAGE_KEY  = 'rag_chat_history';
+const sendBtn       = document.getElementById('sendBtn');
+const charCounter   = document.getElementById('charCounter');
+const STORAGE_KEY   = 'rag_chat_history';
+const MAX_LENGTH    = 2000;
 
 // ------------------------------------------------------------------
 // Session history
@@ -183,7 +185,17 @@ function autoResize(el) {
   el.style.height = Math.min(el.scrollHeight, 140) + 'px';
 }
 
-questionInput.addEventListener('input', () => autoResize(questionInput));
+questionInput.addEventListener('input', () => {
+  autoResize(questionInput);
+  updateCharCounter();
+});
+
+function updateCharCounter() {
+  const len = questionInput.value.length;
+  charCounter.textContent = `${len} / ${MAX_LENGTH}`;
+  charCounter.classList.toggle('warn',  len >= MAX_LENGTH * 0.85 && len < MAX_LENGTH);
+  charCounter.classList.toggle('limit', len >= MAX_LENGTH);
+}
 
 // Submit on Enter, newline on Shift+Enter
 questionInput.addEventListener('keydown', (e) => {
