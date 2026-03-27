@@ -1,7 +1,6 @@
 """RAG pipeline — refactored from rag_demo.py into a reusable class."""
 
 import logging
-import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -109,21 +108,15 @@ class RAGEngine:
         docs = self._load_documents()
         if not docs:
             logger.warning("No documents found in %s — clearing index", self.config.docs_dir)
-            chroma_dir = self.config.chroma_dir
-            if chroma_dir.exists():
-                shutil.rmtree(str(chroma_dir))
-            self._vectorstore = None
-            self._qa_chain = None
+            self._drop_collection()
             return
 
         chunks = self._split_documents(docs)
         logger.info("Created %d chunks from %d document pages", len(chunks), len(docs))
 
-        # Clear existing ChromaDB so deleted documents don't persist
-        chroma_dir = self.config.chroma_dir
-        if chroma_dir.exists():
-            shutil.rmtree(str(chroma_dir))
-        chroma_dir.mkdir(parents=True, exist_ok=True)
+        # Drop collection via API so no open file handle is affected
+        self._drop_collection()
+        self.config.chroma_dir.mkdir(parents=True, exist_ok=True)
 
         self._vectorstore = Chroma.from_documents(
             documents=chunks,
@@ -184,6 +177,35 @@ class RAGEngine:
                 logger.info("Lazy-loaded ChromaDB index")
         except Exception as exc:
             logger.warning("Could not lazy-load index: %s", exc)
+
+    def _drop_collection(self) -> None:
+        """Remove the ChromaDB collection without deleting the directory.
+
+        Reuses the open client when available to avoid the SQLite DBMOVED error
+        that occurs when rmtree deletes a file that is still open.
+        """
+        if self._vectorstore is not None:
+            try:
+                name = self._vectorstore._collection.name
+                self._vectorstore._client.delete_collection(name)
+                logger.info("Dropped ChromaDB collection: %s", name)
+            except Exception as exc:
+                logger.warning("Could not drop collection via open client: %s", exc)
+            self._vectorstore = None
+            self._qa_chain = None
+        else:
+            # No open client — open a temporary one to clear stale data
+            chroma_dir = self.config.chroma_dir
+            if chroma_dir.exists() and any(chroma_dir.iterdir()):
+                try:
+                    import chromadb
+                    client = chromadb.PersistentClient(path=str(chroma_dir))
+                    for col in client.list_collections():
+                        client.delete_collection(col.name)
+                    del client
+                    logger.info("Dropped stale ChromaDB collections")
+                except Exception as exc:
+                    logger.warning("Could not pre-clear ChromaDB: %s", exc)
 
     def _load_documents(self) -> list:
         docs = []
