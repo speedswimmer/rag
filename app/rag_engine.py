@@ -1,6 +1,7 @@
 """RAG pipeline — refactored from rag_demo.py into a reusable class."""
 
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -146,10 +147,22 @@ class RAGEngine:
                 "sources": [],
             }
 
-        try:
-            result = self._qa_chain.invoke({"query": question})
-        except Exception as exc:
-            return {"answer": _friendly_api_error(exc), "sources": []}
+        last_exc: Exception | None = None
+        for attempt, delay in enumerate([0, 5, 15]):
+            if delay:
+                logger.info("Retrying API call after %ds (attempt %d/3) …", delay, attempt + 1)
+                time.sleep(delay)
+            try:
+                result = self._qa_chain.invoke({"query": question})
+                break
+            except Exception as exc:
+                last_exc = exc
+                msg = str(exc).lower()
+                if "overloaded" not in msg and "529" not in msg:
+                    return {"answer": _friendly_api_error(exc), "sources": []}
+                logger.warning("API overloaded (attempt %d/3)", attempt + 1)
+        else:
+            return {"answer": _friendly_api_error(last_exc), "sources": []}
 
         sources = []
         for doc in result.get("source_documents", []):
