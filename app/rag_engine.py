@@ -64,6 +64,7 @@ _RAG_PROMPT = PromptTemplate(
         "Frage: {question}\n\n"
         "Antworte direkt und ohne einleitende Floskeln wie 'Basierend auf den Dokumenten' oder 'Laut den bereitgestellten Informationen'. "
         "Beantworte die Frage so, als würdest du das Wissen einfach kennen. "
+        "Antworte immer in derselben Sprache, in der die Frage gestellt wurde. "
         "Falls die Antwort nicht im Kontext enthalten ist, teile das dem Nutzer klar mit."
     ),
 )
