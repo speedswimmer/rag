@@ -99,30 +99,33 @@ def delete_document(filename: str):
 @documents_bp.post("/upload")
 def upload():
     cfg = current_app.config["RAG_CONFIG"]
-    incoming = [(f.filename, f) for f in request.files.getlist("files") if f.filename]
+
+    # Save files synchronously while the request context is still active
+    saved: list[str] = []
+    errors: list[str] = []
+
+    for file in request.files.getlist("files"):
+        if not file.filename:
+            continue
+        if not cfg.allowed_file(file.filename):
+            errors.append(f"{file.filename}: Dateityp nicht erlaubt")
+            continue
+
+        ext = file.filename.rsplit(".", 1)[1].lower()
+        if not _validate_file_content(file, ext):
+            errors.append(f"{file.filename}: Dateiinhalt entspricht nicht dem erwarteten Format")
+            continue
+
+        filename = secure_filename(file.filename)
+        dest = cfg.docs_dir / filename
+        file.save(str(dest))
+        logger.info("Uploaded: %s", filename)
+        saved.append(filename)
+
+    # Detect scanned PDFs before entering generator
+    scanned = [f for f in saved if f.lower().endswith(".pdf") and is_scanned_pdf(cfg.docs_dir / f)]
 
     def generate():
-        yield _sse("info", "Dateien werden geprüft …")
-
-        saved: list[str] = []
-        errors: list[str] = []
-
-        for original_name, file in incoming:
-            if not cfg.allowed_file(original_name):
-                errors.append(f"{original_name}: Dateityp nicht erlaubt")
-                continue
-
-            ext = original_name.rsplit(".", 1)[1].lower()
-            if not _validate_file_content(file, ext):
-                errors.append(f"{original_name}: Dateiinhalt entspricht nicht dem erwarteten Format")
-                continue
-
-            filename = secure_filename(original_name)
-            dest = cfg.docs_dir / filename
-            file.save(str(dest))
-            logger.info("Uploaded: %s", filename)
-            saved.append(filename)
-
         if not saved:
             msg = errors[0] if errors else "Keine gültigen Dateien hochgeladen"
             yield _sse("error", msg)
@@ -131,14 +134,11 @@ def upload():
         for err in errors:
             yield _sse("warning", err)
 
-        # Detect scanned PDFs for informative message
-        scanned = [f for f in saved if f.lower().endswith(".pdf") and is_scanned_pdf(cfg.docs_dir / f)]
         if scanned:
             yield _sse("done", f"{len(saved)} Datei(en) gespeichert — OCR + Indexierung läuft im Hintergrund …")
         else:
             yield _sse("done", f"{len(saved)} Datei(en) gespeichert — Indexierung läuft im Hintergrund …")
 
-        # Start background indexing (skip if already running)
         if _get_status()["state"] != "running":
             threading.Thread(target=_run_index_in_background, daemon=True).start()
 
