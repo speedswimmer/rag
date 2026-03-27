@@ -498,15 +498,16 @@ html, body {
 
 /* Three-dot action menu */
 .doc-actions { width: 2.5rem; text-align: right; }
+th.doc-actions { border-bottom: none; }
 
 .doc-menu { position: relative; display: inline-block; }
 
 .doc-menu-btn {
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   line-height: 1;
   padding: .3rem .45rem;
   border-radius: 6px;
