@@ -19,8 +19,12 @@ fi
 
 cd "$APP_DIR"
 
-# 2. Create/update Python venv
-echo "[2/5] Setting up Python environment (this can take 10-20 minutes on first run)..."
+# 2. Install system dependencies (OCR + PDF rendering)
+echo "[2/6] Installing system packages for OCR..."
+sudo apt-get install -y tesseract-ocr tesseract-ocr-deu poppler-utils
+
+# 3. Create/update Python venv
+echo "[3/6] Setting up Python environment (this can take 10-20 minutes on first run)..."
 if [ ! -d venv ]; then
     echo "      Creating virtual environment..."
     python3 -m venv venv
@@ -31,7 +35,7 @@ echo "      Installing packages (chromadb + sentence-transformers take the longe
 venv/bin/pip install -r requirements.txt
 
 # 3. Check .env
-echo "[3/5] Checking configuration..."
+echo "[4/6] Checking configuration..."
 if [ ! -f .env ]; then
     cp .env.example .env
     echo ""
@@ -45,11 +49,11 @@ else
 fi
 
 # 4. Ensure dokumente/ directory exists
-echo "[4/5] Ensuring dokumente/ directory exists..."
+echo "[5/6] Ensuring dokumente/ directory exists..."
 mkdir -p dokumente
 
 # 5. Install and (re)start systemd service
-echo "[5/5] Installing and starting service..."
+echo "[6/6] Installing and starting service..."
 sudo cp rag-web.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"

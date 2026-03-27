@@ -23,9 +23,12 @@
         </label>
         <p class="dropzone-selected" id="selectedFiles"></p>
       </div>
-      <button type="submit" class="upload-btn" id="uploadBtn">
-        Hochladen &amp; Indizieren
-      </button>
+      <div class="upload-actions">
+        <button type="submit" class="upload-btn" id="uploadBtn">
+          Hochladen &amp; Indizieren
+        </button>
+        <span class="upload-status" id="uploadStatus" style="display:none"></span>
+      </div>
     </form>
   </section>
 
@@ -68,11 +71,15 @@
 
 <script>
   // Drag-and-drop and file-selection feedback
-  const dropzone = document.getElementById('dropzone');
-  const fileInput = document.getElementById('fileInput');
+  const dropzone      = document.getElementById('dropzone');
+  const fileInput     = document.getElementById('fileInput');
   const selectedFiles = document.getElementById('selectedFiles');
-  const uploadBtn = document.getElementById('uploadBtn');
+  const uploadBtn     = document.getElementById('uploadBtn');
+  const uploadStatus  = document.getElementById('uploadStatus');
 
+  // ----------------------------------------------------------------
+  // File selection feedback
+  // ----------------------------------------------------------------
   function showSelectedFiles(files) {
     if (files.length === 0) {
       selectedFiles.textContent = '';
@@ -85,27 +92,62 @@
 
   fileInput.addEventListener('change', () => showSelectedFiles(fileInput.files));
 
-  dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropzone.classList.add('dragover');
-  });
-
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
   dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-
   dropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropzone.classList.remove('dragover');
-    const dt = e.dataTransfer;
-    if (dt.files.length) {
-      fileInput.files = dt.files;
-      showSelectedFiles(dt.files);
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      showSelectedFiles(e.dataTransfer.files);
     }
   });
 
-  document.getElementById('uploadForm').addEventListener('submit', () => {
+  // ----------------------------------------------------------------
+  // Upload with SSE progress stream
+  // ----------------------------------------------------------------
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!fileInput.files.length) return;
+
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Wird verarbeitet …';
+    setStatus('info', 'Verbindung wird hergestellt …');
+
+    try {
+      const resp = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
+      if (!resp.ok) { setStatus('error', 'Server-Fehler beim Upload'); uploadBtn.disabled = false; return; }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            setStatus(data.event, data.message);
+            if (data.event === 'done')  setTimeout(() => location.reload(), 1200);
+            if (data.event === 'error') uploadBtn.disabled = false;
+          } catch {}
+        }
+      }
+    } catch (err) {
+      setStatus('error', 'Verbindungsfehler: ' + err.message);
+      uploadBtn.disabled = false;
+    }
   });
+
+  function setStatus(event, message) {
+    uploadStatus.textContent = message;
+    uploadStatus.className = 'upload-status upload-status-' + event;
+    uploadStatus.style.display = 'flex';
+  }
 
   // ----------------------------------------------------------------
   // Three-dot menu — open/close

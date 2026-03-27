@@ -12,4 +12,6 @@ chromadb>=0.5
 sentence-transformers>=3.0
 pypdf>=4.0
 docx2txt>=0.8
+pytesseract>=0.3.10
+pdf2image>=1.17
 werkzeug>=3.0

@@ -441,6 +441,64 @@ html, body {
   letter-spacing: .01em;
 }
 
+.upload-actions {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.upload-status {
+  font-size: .875rem;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  color: var(--text-muted);
+}
+
+.upload-status::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+
+.upload-status-done { color: var(--success); }
+.upload-status-done::before {
+  content: '✓';
+  border: none;
+  animation: none;
+  font-size: .9rem;
+  width: auto;
+  height: auto;
+}
+
+.upload-status-error { color: var(--error); }
+.upload-status-error::before {
+  content: '✕';
+  border: none;
+  animation: none;
+  font-size: .9rem;
+  width: auto;
+  height: auto;
+}
+
+.upload-status-warning { color: #f59e0b; }
+.upload-status-warning::before {
+  content: '⚠';
+  border: none;
+  animation: none;
+  font-size: .9rem;
+  width: auto;
+  height: auto;
+}
+
 .upload-btn:hover:not(:disabled) {
   background: var(--accent-hover);
   box-shadow: 0 4px 14px rgba(99,102,241,.35);

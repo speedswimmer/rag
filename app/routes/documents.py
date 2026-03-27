@@ -1,13 +1,14 @@
 """Document routes — list documents and handle uploads."""
 
+import json
 import logging
-import os
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
 from werkzeug.utils import secure_filename
 
 from app import get_index_manager, get_rag_engine
+from app.rag_engine import is_scanned_pdf
 
 # Magic-byte signatures for allowed file types
 _MAGIC_BYTES: dict[str, bytes] = {
@@ -64,54 +65,79 @@ def delete_document(filename: str):
 def upload():
     cfg = current_app.config["RAG_CONFIG"]
 
-    if "files" not in request.files:
-        flash("Keine Datei ausgewählt", "error")
-        return redirect(url_for("documents.list_documents"))
+    # Read file list before entering the generator (request context required)
+    incoming = [
+        (f.filename, f)
+        for f in request.files.getlist("files")
+        if f.filename
+    ]
 
-    uploaded = 0
-    errors = []
+    def generate():
+        yield _sse("info", "Dateien werden geprüft …")
 
-    for file in request.files.getlist("files"):
-        if not file.filename:
-            continue
-        if not cfg.allowed_file(file.filename):
-            errors.append(f"{file.filename}: Dateityp nicht erlaubt")
-            continue
+        saved: list[str] = []
+        errors: list[str] = []
 
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        if not _validate_file_content(file, ext):
-            errors.append(f"{file.filename}: Dateiinhalt entspricht nicht dem erwarteten Format")
-            continue
+        for original_name, file in incoming:
+            if not cfg.allowed_file(original_name):
+                errors.append(f"{original_name}: Dateityp nicht erlaubt")
+                continue
 
-        filename = secure_filename(file.filename)
-        dest = cfg.docs_dir / filename
-        file.save(str(dest))
-        logger.info("Uploaded: %s", filename)
-        uploaded += 1
+            ext = original_name.rsplit(".", 1)[1].lower()
+            if not _validate_file_content(file, ext):
+                errors.append(f"{original_name}: Dateiinhalt entspricht nicht dem erwarteten Format")
+                continue
 
-    if uploaded:
-        # Trigger re-index synchronously (blocks this request ~30-90s on Pi)
-        logger.info("Triggering re-index after upload …")
+            filename = secure_filename(original_name)
+            dest = cfg.docs_dir / filename
+            file.save(str(dest))
+            logger.info("Uploaded: %s", filename)
+            saved.append(filename)
+
+        if not saved:
+            msg = errors[0] if errors else "Keine gültigen Dateien hochgeladen"
+            yield _sse("error", msg)
+            return
+
+        # Detect scanned PDFs for appropriate status message
+        scanned = [f for f in saved if f.lower().endswith(".pdf") and is_scanned_pdf(cfg.docs_dir / f)]
+
+        if scanned:
+            names = ", ".join(scanned)
+            yield _sse(
+                "ocr",
+                f"Texterkennung (OCR) läuft für: {names} — das kann einige Minuten dauern …",
+            )
+        else:
+            yield _sse("indexing", "Dokumente werden indiziert …")
+
         try:
             get_rag_engine().rebuild_index()
             get_index_manager().update_meta()
         except Exception as exc:
-            logger.exception("Re-index failed")
-            errors.append(f"Re-Indexierung fehlgeschlagen: {exc}")
+            logger.exception("Re-index failed after upload")
+            yield _sse("error", f"Indexierung fehlgeschlagen: {exc}")
+            return
 
-        flash(f"{uploaded} Datei(en) hochgeladen und indiziert", "success")
-    else:
-        flash("Keine gültigen Dateien hochgeladen", "error")
+        for err in errors:
+            yield _sse("warning", err)
 
-    for err in errors:
-        flash(err, "error")
+        yield _sse("done", f"{len(saved)} Datei(en) hochgeladen und indiziert")
 
-    return redirect(url_for("documents.list_documents"))
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ------------------------------------------------------------------
 # Helper
 # ------------------------------------------------------------------
+
+def _sse(event: str, message: str) -> str:
+    return f"data: {json.dumps({'event': event, 'message': message})}\n\n"
+
 
 def _validate_file_content(file, ext: str) -> bool:
     """Validate file content via magic bytes (binary types) or null-byte check (text).

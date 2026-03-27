@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from langchain_anthropic import ChatAnthropic
 from langchain_community.document_loaders import DirectoryLoader, Docx2txtLoader, PyPDFLoader, TextLoader
@@ -16,6 +16,38 @@ if TYPE_CHECKING:
     from app.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def is_scanned_pdf(path: Path) -> bool:
+    """Quick heuristic: returns True if a PDF likely contains no extractable text."""
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(str(path))
+        for page in list(reader.pages)[:3]:
+            if len((page.extract_text() or "").strip()) > 50:
+                return False
+        return len(reader.pages) > 0
+    except Exception:
+        return False
+
+
+def _ocr_pdf_page(pdf_path: str, page_index: int) -> str:
+    """Render a single PDF page to an image and run Tesseract OCR on it."""
+    try:
+        from pdf2image import convert_from_path
+        import pytesseract
+
+        images = convert_from_path(
+            pdf_path, first_page=page_index + 1, last_page=page_index + 1, dpi=200
+        )
+        if images:
+            return pytesseract.image_to_string(images[0], lang="deu+eng")
+    except ImportError:
+        logger.warning("pytesseract/pdf2image not installed — OCR skipped")
+    except Exception as exc:
+        logger.warning("OCR failed for page %d of %s: %s", page_index, pdf_path, exc)
+    return ""
+
 
 # Prompt template with explicit prompt-injection defense.
 # The context is wrapped in XML tags to clearly mark it as data, not instructions.
@@ -144,21 +176,29 @@ class RAGEngine:
 
     def _load_documents(self) -> list:
         docs = []
-        docs_dir = str(self.config.docs_dir)
+        docs_dir = Path(self.config.docs_dir)
 
-        try:
-            pdf_loader = DirectoryLoader(
-                docs_dir, glob="**/*.pdf", loader_cls=PyPDFLoader, show_progress=False
-            )
-            pdf_docs = pdf_loader.load()
-            docs.extend(pdf_docs)
-            logger.info("Loaded %d PDF pages", len(pdf_docs))
-        except Exception as exc:
-            logger.warning("PDF loading error: %s", exc)
+        # PDFs — per-file loop with OCR fallback for scanned pages
+        for pdf_path in sorted(docs_dir.glob("**/*.pdf")):
+            try:
+                pages = PyPDFLoader(str(pdf_path)).load()
+                ocr_count = 0
+                for page in pages:
+                    if len(page.page_content.strip()) < 30:
+                        ocr_text = _ocr_pdf_page(str(pdf_path), page.metadata.get("page", 0))
+                        if ocr_text.strip():
+                            page.page_content = ocr_text
+                            ocr_count += 1
+                docs.extend(pages)
+                logger.info(
+                    "Loaded PDF %s: %d pages (%d via OCR)", pdf_path.name, len(pages), ocr_count
+                )
+            except Exception as exc:
+                logger.warning("PDF loading error for %s: %s", pdf_path.name, exc)
 
         try:
             txt_loader = DirectoryLoader(
-                docs_dir,
+                str(docs_dir),
                 glob="**/*.txt",
                 loader_cls=TextLoader,
                 show_progress=False,
@@ -172,7 +212,7 @@ class RAGEngine:
 
         try:
             docx_loader = DirectoryLoader(
-                docs_dir, glob="**/*.docx", loader_cls=Docx2txtLoader, show_progress=False
+                str(docs_dir), glob="**/*.docx", loader_cls=Docx2txtLoader, show_progress=False
             )
             docx_docs = docx_loader.load()
             docs.extend(docx_docs)
