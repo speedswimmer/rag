@@ -44,7 +44,7 @@ class Config:
     # RAG
     chunk_size: int = 1000
     chunk_overlap: int = 200
-    retrieval_k: int = 6
+    retrieval_k: int = 10
     llm_max_tokens: int = 2048
     llm_temperature: float = 0.3
 
