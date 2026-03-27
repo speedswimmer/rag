@@ -34,6 +34,8 @@ function saveHistory(history) {
 // DOM helpers
 // ------------------------------------------------------------------
 
+let _currentExchange = null;
+
 function appendMessage(role, content, sources) {
   const wrapper = document.createElement('div');
   wrapper.className = `message message-${role}`;
@@ -43,14 +45,24 @@ function appendMessage(role, content, sources) {
   bubble.textContent = content;
 
   if (sources && sources.length > 0) {
-    const sourcesEl = buildSources(sources);
     wrapper.appendChild(bubble);
-    wrapper.appendChild(sourcesEl);
+    wrapper.appendChild(buildSources(sources));
   } else {
     wrapper.appendChild(bubble);
   }
 
-  chatMessages.appendChild(wrapper);
+  // Group user question + assistant answer into one exchange block
+  if (role === 'user') {
+    _currentExchange = document.createElement('div');
+    _currentExchange.className = 'exchange';
+    chatMessages.appendChild(_currentExchange);
+    _currentExchange.appendChild(wrapper);
+  } else if (role === 'assistant' && _currentExchange) {
+    _currentExchange.appendChild(wrapper);
+  } else {
+    chatMessages.appendChild(wrapper);
+  }
+
   scrollToBottom();
   return wrapper;
 }
