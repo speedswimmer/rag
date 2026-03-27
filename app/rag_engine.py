@@ -1,6 +1,7 @@
 """RAG pipeline — refactored from rag_demo.py into a reusable class."""
 
 import logging
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
@@ -108,11 +109,22 @@ class RAGEngine:
         logger.info("Starting full index rebuild …")
         docs = self._load_documents()
         if not docs:
-            logger.warning("No documents found in %s — index not built", self.config.docs_dir)
+            logger.warning("No documents found in %s — clearing index", self.config.docs_dir)
+            chroma_dir = self.config.chroma_dir
+            if chroma_dir.exists():
+                shutil.rmtree(str(chroma_dir))
+            self._vectorstore = None
+            self._qa_chain = None
             return
 
         chunks = self._split_documents(docs)
         logger.info("Created %d chunks from %d document pages", len(chunks), len(docs))
+
+        # Clear existing ChromaDB so deleted documents don't persist
+        chroma_dir = self.config.chroma_dir
+        if chroma_dir.exists():
+            shutil.rmtree(str(chroma_dir))
+        chroma_dir.mkdir(parents=True, exist_ok=True)
 
         self._vectorstore = Chroma.from_documents(
             documents=chunks,
