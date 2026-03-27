@@ -8,7 +8,14 @@
 </head>
 <body>
   <nav class="nav">
-    <a href="/" class="nav-brand">RAG System</a>
+    <a href="/" class="nav-brand">
+      <span class="nav-brand-icon" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </span>
+      RAG System
+    </a>
     <div class="nav-links">
       <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Chat</a>
       <a href="/documents" class="nav-link {% if request.path == '/documents' %}active{% endif %}">Dokumente</a>

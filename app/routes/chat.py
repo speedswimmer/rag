@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint("chat", __name__)
 
+_MAX_QUESTION_LENGTH = 2000
+
 
 @chat_bp.get("/")
 def index():
@@ -23,6 +25,9 @@ def ask():
 
     if not question:
         return jsonify({"error": "Keine Frage angegeben"}), 400
+
+    if len(question) > _MAX_QUESTION_LENGTH:
+        return jsonify({"error": f"Frage zu lang (maximal {_MAX_QUESTION_LENGTH} Zeichen)"}), 400
 
     logger.info("Question received: %s", question[:80])
     try:

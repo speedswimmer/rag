@@ -9,10 +9,15 @@
   <section class="upload-section">
     <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
       <div class="dropzone" id="dropzone">
-        <div class="dropzone-icon">&#128196;</div>
+        <div class="dropzone-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
         <p class="dropzone-text">PDF oder TXT-Dateien hier ablegen</p>
         <p class="dropzone-sub">oder</p>
         <label class="file-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Dateien auswählen
           <input type="file" name="files" id="fileInput" multiple accept=".pdf,.txt" class="file-input-hidden">
         </label>
@@ -28,26 +33,35 @@
   <section class="docs-section">
     <h2 class="section-title">Indizierte Dokumente ({{ documents | length }})</h2>
     {% if documents %}
-      <table class="docs-table">
+      <table class="docs-table" id="docsTable">
         <thead>
           <tr>
             <th>Name</th>
             <th>Größe</th>
             <th>Zuletzt geändert</th>
+            <th class="doc-actions"></th>
           </tr>
         </thead>
         <tbody>
           {% for doc in documents %}
-          <tr>
+          <tr data-filename="{{ doc.name }}">
             <td class="doc-name">{{ doc.name }}</td>
             <td class="doc-size">{{ (doc.size / 1024) | round(1) }} KB</td>
             <td class="doc-mtime">{{ doc.mtime | int | timestamp_to_str }}</td>
+            <td class="doc-actions">
+              <div class="doc-menu">
+                <button class="doc-menu-btn" aria-label="Aktionen" title="Aktionen">&#8943;</button>
+                <div class="doc-menu-dropdown">
+                  <button class="doc-menu-action danger" data-action="delete">Löschen</button>
+                </div>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     {% else %}
-      <p class="empty-hint">Noch keine Dokumente vorhanden. Lade eine Datei hoch.</p>
+      <p class="empty-hint" id="emptyHint">Noch keine Dokumente vorhanden. Lade eine Datei hoch.</p>
     {% endif %}
   </section>
 </div>
@@ -91,6 +105,79 @@
   document.getElementById('uploadForm').addEventListener('submit', () => {
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Wird verarbeitet …';
+  });
+
+  // ----------------------------------------------------------------
+  // Three-dot menu — open/close
+  // ----------------------------------------------------------------
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.doc-menu-btn');
+    const allDropdowns = document.querySelectorAll('.doc-menu-dropdown');
+
+    if (btn) {
+      const dropdown = btn.nextElementSibling;
+      const isOpen = dropdown.classList.contains('open');
+      allDropdowns.forEach(d => d.classList.remove('open'));
+      if (!isOpen) dropdown.classList.add('open');
+    } else if (!e.target.closest('.doc-menu-dropdown')) {
+      allDropdowns.forEach(d => d.classList.remove('open'));
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Delete action
+  // ----------------------------------------------------------------
+  document.getElementById('docsTable')?.addEventListener('click', async (e) => {
+    const actionBtn = e.target.closest('[data-action="delete"]');
+    if (!actionBtn) return;
+
+    const row = actionBtn.closest('tr');
+    const filename = row.dataset.filename;
+
+    // Close the dropdown first
+    actionBtn.closest('.doc-menu-dropdown').classList.remove('open');
+
+    actionBtn.disabled = true;
+    actionBtn.textContent = 'Wird gelöscht …';
+
+    try {
+      const resp = await fetch(`/documents/${encodeURIComponent(filename)}`, {
+        method: 'DELETE',
+      });
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        alert(`Fehler: ${data.error || resp.statusText}`);
+        actionBtn.disabled = false;
+        actionBtn.textContent = 'Löschen';
+        return;
+      }
+
+      row.remove();
+
+      // If no rows remain, swap table for empty hint
+      const tbody = document.querySelector('#docsTable tbody');
+      if (!tbody || tbody.rows.length === 0) {
+        document.getElementById('docsTable').replaceWith(
+          Object.assign(document.createElement('p'), {
+            id: 'emptyHint',
+            className: 'empty-hint',
+            textContent: 'Noch keine Dokumente vorhanden. Lade eine Datei hoch.',
+          })
+        );
+      } else {
+        // Update count in section heading
+        const heading = document.querySelector('.section-title');
+        if (heading) {
+          const count = tbody.rows.length;
+          heading.textContent = `Indizierte Dokumente (${count})`;
+        }
+      }
+    } catch (err) {
+      alert(`Verbindungsfehler: ${err.message}`);
+      actionBtn.disabled = false;
+      actionBtn.textContent = 'Löschen';
+    }
   });
 </script>
 {% endblock %}
