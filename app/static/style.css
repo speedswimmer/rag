@@ -87,6 +87,33 @@ html, body {
 
 .nav-links { display: flex; gap: .2rem; }
 
+/* Background index status indicator */
+.index-status {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-left: .75rem;
+}
+
+.index-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: index-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes index-pulse {
+  0%, 100% { opacity: 1;  transform: scale(1); }
+  50%       { opacity: .3; transform: scale(.65); }
+}
+
+.index-status-done  .index-dot { background: var(--success); animation: none; }
+.index-status-error .index-dot { background: var(--error);   animation: none; }
+
 .nav-link {
   padding: .32rem .85rem;
   border-radius: 7px;

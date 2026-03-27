@@ -21,7 +21,41 @@
       <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Chat</a>
       <a href="/documents" class="nav-link {% if request.path == '/documents' %}active{% endif %}">Dokumente</a>
     </div>
+    <div class="index-status" id="indexStatus" style="display:none" aria-live="polite">
+      <span class="index-dot"></span>
+      <span class="index-msg" id="indexMsg"></span>
+    </div>
   </nav>
+
+  <script>
+    (function pollIndexStatus() {
+      const el  = document.getElementById('indexStatus');
+      const msg = document.getElementById('indexMsg');
+      let hideTimer = null;
+
+      async function check() {
+        try {
+          const data = await fetch('/index/status').then(r => r.json());
+
+          if (data.state === 'idle') {
+            el.style.display = 'none';
+          } else {
+            el.style.display = 'flex';
+            el.className = 'index-status index-status-' + data.state;
+            msg.textContent = data.message;
+
+            if (data.state === 'done' || data.state === 'error') {
+              clearTimeout(hideTimer);
+              hideTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+            }
+          }
+        } catch {}
+        setTimeout(check, 2000);
+      }
+
+      check();
+    })();
+  </script>
 
   <main class="main-content">
     {% with messages = get_flashed_messages(with_categories=true) %}

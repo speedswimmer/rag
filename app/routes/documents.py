@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 from pathlib import Path
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
@@ -15,19 +16,58 @@ _MAGIC_BYTES: dict[str, bytes] = {
     "pdf":  b"%PDF-",
     "docx": b"PK\x03\x04",   # DOCX is a ZIP archive
 }
-# Maximum bytes to read for binary detection in text files
 _TXT_SAMPLE_SIZE = 512
 
 logger = logging.getLogger(__name__)
 
 documents_bp = Blueprint("documents", __name__)
 
+# ------------------------------------------------------------------
+# Background indexing state (shared across threads, single worker)
+# ------------------------------------------------------------------
+
+_status_lock = threading.Lock()
+_index_status: dict = {"state": "idle", "message": ""}
+
+
+def _set_status(state: str, message: str) -> None:
+    with _status_lock:
+        _index_status["state"] = state
+        _index_status["message"] = message
+
+
+def _get_status() -> dict:
+    with _status_lock:
+        return dict(_index_status)
+
+
+def _run_index_in_background() -> None:
+    """Rebuild index in a daemon thread. Called after files are saved."""
+    try:
+        _set_status("running", "Index wird aufgebaut …")
+        get_rag_engine().rebuild_index()
+        get_index_manager().update_meta()
+        _set_status("done", "Index aktualisiert")
+        logger.info("Background index rebuild complete")
+    except Exception as exc:
+        logger.exception("Background index rebuild failed")
+        _set_status("error", f"Indexierung fehlgeschlagen: {exc}")
+
+
+# ------------------------------------------------------------------
+# Routes
+# ------------------------------------------------------------------
 
 @documents_bp.get("/documents")
 def list_documents():
     cfg = current_app.config["RAG_CONFIG"]
     docs = _get_document_list(cfg.docs_dir)
     return render_template("documents.html", documents=docs)
+
+
+@documents_bp.get("/index/status")
+def index_status():
+    return jsonify(_get_status())
 
 
 @documents_bp.delete("/documents/<filename>")
@@ -39,7 +79,6 @@ def delete_document(filename: str):
         return jsonify({"error": "Ungültiger Dateiname"}), 400
 
     target = cfg.docs_dir / safe_name
-    # Guard against path traversal
     try:
         target.resolve().relative_to(cfg.docs_dir.resolve())
     except ValueError:
@@ -51,12 +90,8 @@ def delete_document(filename: str):
     target.unlink()
     logger.info("Deleted: %s", safe_name)
 
-    try:
-        get_rag_engine().rebuild_index()
-        get_index_manager().update_meta()
-    except Exception as exc:
-        logger.exception("Re-index failed after deletion")
-        return jsonify({"error": f"Re-Indexierung fehlgeschlagen: {exc}"}), 500
+    if _get_status()["state"] != "running":
+        threading.Thread(target=_run_index_in_background, daemon=True).start()
 
     return jsonify({"ok": True})
 
@@ -64,13 +99,7 @@ def delete_document(filename: str):
 @documents_bp.post("/upload")
 def upload():
     cfg = current_app.config["RAG_CONFIG"]
-
-    # Read file list before entering the generator (request context required)
-    incoming = [
-        (f.filename, f)
-        for f in request.files.getlist("files")
-        if f.filename
-    ]
+    incoming = [(f.filename, f) for f in request.files.getlist("files") if f.filename]
 
     def generate():
         yield _sse("info", "Dateien werden geprüft …")
@@ -99,30 +128,19 @@ def upload():
             yield _sse("error", msg)
             return
 
-        # Detect scanned PDFs for appropriate status message
-        scanned = [f for f in saved if f.lower().endswith(".pdf") and is_scanned_pdf(cfg.docs_dir / f)]
-
-        if scanned:
-            names = ", ".join(scanned)
-            yield _sse(
-                "ocr",
-                f"Texterkennung (OCR) läuft für: {names} — das kann einige Minuten dauern …",
-            )
-        else:
-            yield _sse("indexing", "Dokumente werden indiziert …")
-
-        try:
-            get_rag_engine().rebuild_index()
-            get_index_manager().update_meta()
-        except Exception as exc:
-            logger.exception("Re-index failed after upload")
-            yield _sse("error", f"Indexierung fehlgeschlagen: {exc}")
-            return
-
         for err in errors:
             yield _sse("warning", err)
 
-        yield _sse("done", f"{len(saved)} Datei(en) hochgeladen und indiziert")
+        # Detect scanned PDFs for informative message
+        scanned = [f for f in saved if f.lower().endswith(".pdf") and is_scanned_pdf(cfg.docs_dir / f)]
+        if scanned:
+            yield _sse("done", f"{len(saved)} Datei(en) gespeichert — OCR + Indexierung läuft im Hintergrund …")
+        else:
+            yield _sse("done", f"{len(saved)} Datei(en) gespeichert — Indexierung läuft im Hintergrund …")
+
+        # Start background indexing (skip if already running)
+        if _get_status()["state"] != "running":
+            threading.Thread(target=_run_index_in_background, daemon=True).start()
 
     return Response(
         stream_with_context(generate()),
@@ -140,10 +158,6 @@ def _sse(event: str, message: str) -> str:
 
 
 def _validate_file_content(file, ext: str) -> bool:
-    """Validate file content via magic bytes (binary types) or null-byte check (text).
-
-    Always seeks back to position 0 so the caller can still save the file.
-    """
     if ext == "pdf":
         header = file.read(5)
         file.seek(0)
@@ -155,7 +169,6 @@ def _validate_file_content(file, ext: str) -> bool:
     if ext == "txt":
         sample = file.read(_TXT_SAMPLE_SIZE)
         file.seek(0)
-        # Reject binary content masquerading as plain text
         return b"\x00" not in sample
     return False
 
