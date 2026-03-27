@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Info — RAG System{% endblock %}
+
+{% block content %}
+<div class="docs-container">
+
+  <div class="info-header">
+    <h1 class="page-title">RAG System</h1>
+    <span class="version-badge">Version {{ version }}</span>
+  </div>
+
+  <!-- System-Konfiguration -->
+  <section class="info-section">
+    <h2 class="section-title">Aktuelle Konfiguration</h2>
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="info-key">KI-Modell</td>
+          <td class="info-val">{{ cfg.llm_model }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Embedding-Modell</td>
+          <td class="info-val">{{ cfg.embedding_model }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Abgerufene Textpassagen pro Anfrage</td>
+          <td class="info-val">{{ cfg.retrieval_k }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Chunk-Größe</td>
+          <td class="info-val">{{ cfg.chunk_size }} Zeichen</td>
+        </tr>
+        <tr>
+          <td class="info-key">Chunk-Überlappung</td>
+          <td class="info-val">{{ cfg.chunk_overlap }} Zeichen</td>
+        </tr>
+        <tr>
+          <td class="info-key">Maximale Antwortlänge</td>
+          <td class="info-val">{{ cfg.llm_max_tokens }} Tokens</td>
+        </tr>
+        <tr>
+          <td class="info-key">Unterstützte Dateiformate</td>
+          <td class="info-val">{{ cfg.allowed_extensions | join(', ') | upper }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Maximale Upload-Größe</td>
+          <td class="info-val">{{ (cfg.max_content_length / 1024 / 1024) | int }} MB</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Feature-Übersicht -->
+  <section class="info-section">
+    <h2 class="section-title">Funktionsumfang</h2>
+    <ul class="feature-list">
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Dokumenten-Upload</strong>
+          PDF, Word (.docx) und TXT — mit Magic-Byte-Validierung gegen getarnte Dateien
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>OCR für gescannte PDFs</strong>
+          Seiten ohne extrahierbaren Text werden automatisch per Tesseract OCR erkannt (Deutsch + Englisch)
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Hintergrund-Indexierung</strong>
+          Nach dem Upload wird der Index im Hintergrund aufgebaut — der Chat bleibt durchgehend nutzbar
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Erweiterter Kontext</strong>
+          Pro Anfrage werden {{ cfg.retrieval_k }} relevante Textpassagen abgerufen (vorher: 3) für vollständigere Antworten
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Prompt-Injection-Schutz</strong>
+          Dokument-Inhalte werden sauber vom Anweisung-Kontext getrennt — eingebettete Befehle in Dokumenten werden ignoriert
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Dokumente verwalten</strong>
+          Hochladen und einzeln löschen über die Dokumenten-Seite
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Quellenangaben</strong>
+          Jede Antwort zeigt die Dokumente und Seiten auf denen sie basiert
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Smart Indexing</strong>
+          Beim Neustart wird der Index nur neu gebaut wenn sich Dokumente geändert haben (SHA-256 + Änderungszeit)
+        </div>
+      </li>
+    </ul>
+  </section>
+
+</div>
+{% endblock %}

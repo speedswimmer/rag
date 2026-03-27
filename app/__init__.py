@@ -57,9 +57,11 @@ def create_app(config: Config | None = None) -> Flask:
     # Register blueprints
     from app.routes.chat import chat_bp
     from app.routes.documents import documents_bp
+    from app.routes.info import info_bp
 
     app.register_blueprint(chat_bp)
     app.register_blueprint(documents_bp)
+    app.register_blueprint(info_bp)
 
     # Jinja2 custom filter
     import datetime

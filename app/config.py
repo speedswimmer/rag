@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+APP_VERSION = "0.5"
+
 
 @dataclass
 class Config:
