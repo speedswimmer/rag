@@ -88,16 +88,15 @@ class RAGEngine:
             model_kwargs={"device": "cpu"},
         )
 
-        chroma_dir = str(self.config.chroma_dir)
-        # Check if a persisted collection already exists
-        import chromadb
-        client = chromadb.PersistentClient(path=chroma_dir)
-        collections = client.list_collections()
+        chroma_dir = self.config.chroma_dir
+        # Check for existing DB by looking for files — avoids opening a PersistentClient
+        # that would hold the SQLite file open and conflict with a later shutil.rmtree
+        has_existing = chroma_dir.exists() and any(chroma_dir.iterdir())
 
-        if collections:
+        if has_existing:
             logger.info("Opening existing ChromaDB at %s", chroma_dir)
             self._vectorstore = Chroma(
-                persist_directory=chroma_dir,
+                persist_directory=str(chroma_dir),
                 embedding_function=self._embeddings,
             )
             self._build_chain()
@@ -175,11 +174,10 @@ class RAGEngine:
     def _try_load_existing_index(self) -> None:
         """Try to open ChromaDB from disk if it was populated after startup."""
         try:
-            import chromadb
-            client = chromadb.PersistentClient(path=str(self.config.chroma_dir))
-            if client.list_collections():
+            chroma_dir = self.config.chroma_dir
+            if chroma_dir.exists() and any(chroma_dir.iterdir()):
                 self._vectorstore = Chroma(
-                    persist_directory=str(self.config.chroma_dir),
+                    persist_directory=str(chroma_dir),
                     embedding_function=self._embeddings,
                 )
                 self._build_chain()
