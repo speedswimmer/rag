@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from langchain_anthropic import ChatAnthropic
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
+from langchain_community.document_loaders import DirectoryLoader, Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_classic.chains import RetrievalQA
@@ -169,6 +169,16 @@ class RAGEngine:
             logger.info("Loaded %d TXT documents", len(txt_docs))
         except Exception as exc:
             logger.warning("TXT loading error: %s", exc)
+
+        try:
+            docx_loader = DirectoryLoader(
+                docs_dir, glob="**/*.docx", loader_cls=Docx2txtLoader, show_progress=False
+            )
+            docx_docs = docx_loader.load()
+            docs.extend(docx_docs)
+            logger.info("Loaded %d DOCX documents", len(docx_docs))
+        except Exception as exc:
+            logger.warning("DOCX loading error: %s", exc)
 
         return docs
 

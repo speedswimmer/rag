@@ -11,7 +11,8 @@ from app import get_index_manager, get_rag_engine
 
 # Magic-byte signatures for allowed file types
 _MAGIC_BYTES: dict[str, bytes] = {
-    "pdf": b"%PDF-",
+    "pdf":  b"%PDF-",
+    "docx": b"PK\x03\x04",   # DOCX is a ZIP archive
 }
 # Maximum bytes to read for binary detection in text files
 _TXT_SAMPLE_SIZE = 512
@@ -121,6 +122,10 @@ def _validate_file_content(file, ext: str) -> bool:
         header = file.read(5)
         file.seek(0)
         return header == _MAGIC_BYTES["pdf"]
+    if ext == "docx":
+        header = file.read(4)
+        file.seek(0)
+        return header == _MAGIC_BYTES["docx"]
     if ext == "txt":
         sample = file.read(_TXT_SAMPLE_SIZE)
         file.seek(0)
@@ -132,7 +137,7 @@ def _validate_file_content(file, ext: str) -> bool:
 def _get_document_list(docs_dir: Path) -> list[dict]:
     result = []
     for p in sorted(docs_dir.glob("**/*")):
-        if p.is_file() and p.suffix.lower() in {".pdf", ".txt"}:
+        if p.is_file() and p.suffix.lower() in {".pdf", ".txt", ".docx"}:
             stat = p.stat()
             result.append({
                 "name": p.name,
