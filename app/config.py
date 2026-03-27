@@ -39,8 +39,8 @@ class Config:
     # RAG
     chunk_size: int = 1000
     chunk_overlap: int = 200
-    retrieval_k: int = 3
-    llm_max_tokens: int = 1024
+    retrieval_k: int = 6
+    llm_max_tokens: int = 2048
     llm_temperature: float = 0.3
 
     def __post_init__(self):
