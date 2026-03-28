@@ -61,6 +61,7 @@ def create_app(config: Config | None = None) -> Flask:
         logger.info("No document changes — skipping index rebuild")
 
     # Register blueprints
+    from app.routes.admin import admin_bp
     from app.routes.chat import chat_bp
     from app.routes.documents import documents_bp
     from app.routes.info import info_bp
@@ -68,6 +69,7 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(chat_bp)
     app.register_blueprint(documents_bp)
     app.register_blueprint(info_bp)
+    app.register_blueprint(admin_bp)
 
     # Jinja2 custom filter
     import datetime

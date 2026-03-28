@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Admin — RAG System{% endblock %}
+
+{% block content %}
+<div class="docs-container">
+  <h1 class="page-title">Admin</h1>
+
+  <!-- Upload -->
+  <section class="upload-section">
+    <h2 class="section-title">Dokument hochladen</h2>
+    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="dropzone-text">PDF, Word oder TXT-Dateien hier ablegen</p>
+        <p class="dropzone-sub">oder</p>
+        <label class="file-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Dateien auswählen
+          <input type="file" name="files" id="fileInput" multiple accept=".pdf,.docx,.txt" class="file-input-hidden">
+        </label>
+        <p class="dropzone-selected" id="selectedFiles"></p>
+      </div>
+      <div class="upload-actions">
+        <button type="submit" class="upload-btn" id="uploadBtn">Hochladen &amp; Indizieren</button>
+        <span class="upload-status" id="uploadStatus" style="display:none"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- Document list with delete -->
+  <section class="docs-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Indizierte Dokumente ({{ documents | length }})</h2>
+    {% if documents %}
+      <table class="docs-table" id="docsTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Größe</th>
+            <th>Zuletzt geändert</th>
+            <th class="doc-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr data-filename="{{ doc.name }}">
+            <td class="doc-name">{{ doc.name }}</td>
+            <td class="doc-size">{{ (doc.size / 1024) | round(1) }} KB</td>
+            <td class="doc-mtime">{{ doc.mtime | int | timestamp_to_str }}</td>
+            <td class="doc-actions">
+              <div class="doc-menu">
+                <button class="doc-menu-btn" aria-label="Aktionen" title="Aktionen">&#8943;</button>
+                <div class="doc-menu-dropdown">
+                  <button class="doc-menu-action danger" data-action="delete">Löschen</button>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty-hint" id="emptyHint">Noch keine Dokumente vorhanden.</p>
+    {% endif %}
+  </section>
+
+  <!-- Index info -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Index</h2>
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="info-key">Letzter Index-Aufbau</td>
+          <td class="info-val">{{ last_index or "—" }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Gespeicherte Chunks</td>
+          <td class="info-val">{{ chunk_count if chunk_count is not none else "—" }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Dokumente</td>
+          <td class="info-val">{{ documents | length }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:1rem">
+      <button class="upload-btn" id="rebuildBtn">Index neu aufbauen</button>
+      <span class="upload-status" id="rebuildStatus" style="display:none"></span>
+    </div>
+  </section>
+
+  <!-- System info -->
+  <section class="info-section">
+    <h2 class="section-title">System</h2>
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="info-key">Version</td>
+          <td class="info-val">{{ version }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">KI-Modell</td>
+          <td class="info-val">{{ cfg.llm_model }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Embedding-Modell</td>
+          <td class="info-val">{{ cfg.embedding_model }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Abgerufene Chunks pro Anfrage</td>
+          <td class="info-val">{{ cfg.retrieval_k }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Maximale Upload-Größe</td>
+          <td class="info-val">{{ (cfg.max_content_length / 1024 / 1024) | int }} MB</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<script>
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+  // ----------------------------------------------------------------
+  // Upload
+  // ----------------------------------------------------------------
+  const dropzone      = document.getElementById('dropzone');
+  const fileInput     = document.getElementById('fileInput');
+  const selectedFiles = document.getElementById('selectedFiles');
+  const uploadBtn     = document.getElementById('uploadBtn');
+  const uploadStatus  = document.getElementById('uploadStatus');
+
+  function showSelectedFiles(files) {
+    if (files.length === 0) selectedFiles.textContent = '';
+    else if (files.length === 1) selectedFiles.textContent = files[0].name;
+    else selectedFiles.textContent = files.length + ' Dateien ausgewählt';
+  }
+
+  fileInput.addEventListener('change', () => showSelectedFiles(fileInput.files));
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; showSelectedFiles(e.dataTransfer.files); }
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!fileInput.files.length) return;
+    uploadBtn.disabled = true;
+    setUploadStatus('info', 'Verbindung wird hergestellt …');
+    try {
+      const resp = await fetch('/upload', { method: 'POST', body: new FormData(e.target), headers: { 'X-CSRFToken': csrfToken } });
+      if (!resp.ok) { setUploadStatus('error', 'Server-Fehler beim Upload'); uploadBtn.disabled = false; return; }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            setUploadStatus(data.event, data.message);
+            if (data.event === 'done')  setTimeout(() => location.reload(), 1200);
+            if (data.event === 'error') uploadBtn.disabled = false;
+          } catch {}
+        }
+      }
+    } catch (err) { setUploadStatus('error', 'Verbindungsfehler: ' + err.message); uploadBtn.disabled = false; }
+  });
+
+  function setUploadStatus(event, message) {
+    uploadStatus.textContent = message;
+    uploadStatus.className = 'upload-status upload-status-' + event;
+    uploadStatus.style.display = 'flex';
+  }
+
+  // ----------------------------------------------------------------
+  // Delete
+  // ----------------------------------------------------------------
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.doc-menu-btn');
+    const allDropdowns = document.querySelectorAll('.doc-menu-dropdown');
+    if (btn) {
+      const dropdown = btn.nextElementSibling;
+      const isOpen = dropdown.classList.contains('open');
+      allDropdowns.forEach(d => d.classList.remove('open'));
+      if (!isOpen) dropdown.classList.add('open');
+    } else if (!e.target.closest('.doc-menu-dropdown')) {
+      allDropdowns.forEach(d => d.classList.remove('open'));
+    }
+  });
+
+  document.getElementById('docsTable')?.addEventListener('click', async (e) => {
+    const actionBtn = e.target.closest('[data-action="delete"]');
+    if (!actionBtn) return;
+    const row = actionBtn.closest('tr');
+    const filename = row.dataset.filename;
+    actionBtn.closest('.doc-menu-dropdown').classList.remove('open');
+    actionBtn.disabled = true;
+    actionBtn.textContent = 'Wird gelöscht …';
+    try {
+      const resp = await fetch(`/documents/${encodeURIComponent(filename)}`, { method: 'DELETE', headers: { 'X-CSRFToken': csrfToken } });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { alert(`Fehler: ${data.error || resp.statusText}`); actionBtn.disabled = false; actionBtn.textContent = 'Löschen'; return; }
+      row.remove();
+      const tbody = document.querySelector('#docsTable tbody');
+      if (!tbody || tbody.rows.length === 0) {
+        document.getElementById('docsTable').replaceWith(Object.assign(document.createElement('p'), { id: 'emptyHint', className: 'empty-hint', textContent: 'Noch keine Dokumente vorhanden.' }));
+      } else {
+        const heading = document.querySelector('.docs-section .section-title');
+        if (heading) heading.textContent = `Indizierte Dokumente (${tbody.rows.length})`;
+      }
+    } catch (err) { alert(`Verbindungsfehler: ${err.message}`); actionBtn.disabled = false; actionBtn.textContent = 'Löschen'; }
+  });
+
+  // ----------------------------------------------------------------
+  // Rebuild index
+  // ----------------------------------------------------------------
+  const rebuildBtn    = document.getElementById('rebuildBtn');
+  const rebuildStatus = document.getElementById('rebuildStatus');
+
+  rebuildBtn.addEventListener('click', async () => {
+    rebuildBtn.disabled = true;
+    rebuildStatus.textContent = 'Index wird aufgebaut …';
+    rebuildStatus.className = 'upload-status';
+    rebuildStatus.style.display = 'flex';
+    try {
+      const resp = await fetch('/admin/rebuild', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
+      if (resp.ok) {
+        rebuildStatus.textContent = 'Gestartet — Status in der Navbar sichtbar';
+        rebuildStatus.className = 'upload-status upload-status-done';
+        setTimeout(() => { rebuildBtn.disabled = false; rebuildStatus.style.display = 'none'; }, 4000);
+      } else {
+        rebuildStatus.textContent = 'Fehler beim Starten';
+        rebuildStatus.className = 'upload-status upload-status-error';
+        rebuildBtn.disabled = false;
+      }
+    } catch (err) {
+      rebuildStatus.textContent = 'Verbindungsfehler';
+      rebuildStatus.className = 'upload-status upload-status-error';
+      rebuildBtn.disabled = false;
+    }
+  });
+</script>
+{% endblock %}
