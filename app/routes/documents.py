@@ -171,7 +171,7 @@ def _validate_file_content(file, ext: str) -> bool:
         header = file.read(4)
         file.seek(0)
         return header == _MAGIC_BYTES["docx"]
-    if ext == "txt":
+    if ext in ("txt", "md"):
         sample = file.read(_TXT_SAMPLE_SIZE)
         file.seek(0)
         return b"\x00" not in sample

@@ -38,7 +38,7 @@ class Config:
 
     # Upload
     allowed_extensions: frozenset = field(
-        default_factory=lambda: frozenset({"pdf", "txt", "docx"})
+        default_factory=lambda: frozenset({"pdf", "txt", "docx", "md"})
     )
 
     # RAG

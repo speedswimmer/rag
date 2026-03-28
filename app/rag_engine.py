@@ -244,19 +244,20 @@ class RAGEngine:
             except Exception as exc:
                 logger.warning("PDF loading error for %s: %s", pdf_path.name, exc)
 
-        try:
-            txt_loader = DirectoryLoader(
-                str(docs_dir),
-                glob="**/*.txt",
-                loader_cls=TextLoader,
-                show_progress=False,
-                loader_kwargs={"autodetect_encoding": True},
-            )
-            txt_docs = txt_loader.load()
-            docs.extend(txt_docs)
-            logger.info("Loaded %d TXT documents", len(txt_docs))
-        except Exception as exc:
-            logger.warning("TXT loading error: %s", exc)
+        for glob_pattern, label in [("**/*.txt", "TXT"), ("**/*.md", "MD")]:
+            try:
+                loader = DirectoryLoader(
+                    str(docs_dir),
+                    glob=glob_pattern,
+                    loader_cls=TextLoader,
+                    show_progress=False,
+                    loader_kwargs={"autodetect_encoding": True},
+                )
+                loaded = loader.load()
+                docs.extend(loaded)
+                logger.info("Loaded %d %s documents", len(loaded), label)
+            except Exception as exc:
+                logger.warning("%s loading error: %s", label, exc)
 
         try:
             docx_loader = DirectoryLoader(
