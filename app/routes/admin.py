@@ -4,11 +4,12 @@ import datetime
 import logging
 import threading
 
-from flask import Blueprint, current_app, jsonify, render_template
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app import get_rag_engine
 from app.config import APP_VERSION
 from app.routes.documents import _get_document_list, _run_index_in_background
+from app.settings import get_app_name, save_app_name
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,17 @@ def admin():
 @admin_bp.post("/admin/rebuild")
 def rebuild():
     threading.Thread(target=_run_index_in_background, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@admin_bp.post("/admin/settings")
+def save_settings():
+    name = (request.json or {}).get("app_name", "").strip()
+    if not name:
+        return jsonify({"error": "Name darf nicht leer sein"}), 400
+    if len(name) > 60:
+        return jsonify({"error": "Name zu lang (max. 60 Zeichen)"}), 400
+    save_app_name(name)
     return jsonify({"ok": True})
 
 

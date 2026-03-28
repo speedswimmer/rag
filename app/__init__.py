@@ -78,4 +78,11 @@ def create_app(config: Config | None = None) -> Flask:
     def timestamp_to_str(ts: float) -> str:
         return datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M")
 
+    # Inject app_name into every template context
+    from app.settings import get_app_name
+
+    @app.context_processor
+    def inject_app_name():
+        return {"app_name": get_app_name()}
+
     return app

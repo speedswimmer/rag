@@ -92,6 +92,20 @@
     </div>
   </section>
 
+  <!-- App Settings -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Einstellungen</h2>
+    <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+      <input type="text" id="appNameInput" value="{{ app_name }}" maxlength="60"
+             style="background:var(--bg-input);border:1px solid var(--border-light);color:var(--text);
+                    border-radius:var(--radius);padding:.5rem .85rem;font-size:.9rem;font-family:inherit;
+                    flex:1;min-width:200px;max-width:360px;outline:none;"
+             placeholder="Systemname">
+      <button class="upload-btn" id="saveNameBtn" style="margin-top:0">Speichern</button>
+      <span id="saveNameStatus" style="font-size:.875rem;display:none"></span>
+    </div>
+  </section>
+
   <!-- System info -->
   <section class="info-section">
     <h2 class="section-title">System</h2>
@@ -222,6 +236,40 @@
         if (heading) heading.textContent = `Indizierte Dokumente (${tbody.rows.length})`;
       }
     } catch (err) { alert(`Verbindungsfehler: ${err.message}`); actionBtn.disabled = false; actionBtn.textContent = 'Löschen'; }
+  });
+
+  // ----------------------------------------------------------------
+  // Save app name
+  // ----------------------------------------------------------------
+  document.getElementById('saveNameBtn').addEventListener('click', async () => {
+    const input  = document.getElementById('appNameInput');
+    const status = document.getElementById('saveNameStatus');
+    const name   = input.value.trim();
+    if (!name) return;
+
+    try {
+      const resp = await fetch('/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ app_name: name }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        status.textContent = 'Gespeichert';
+        status.style.color = 'var(--success)';
+        status.style.display = 'inline';
+        document.title = name;
+        setTimeout(() => { status.style.display = 'none'; }, 3000);
+      } else {
+        status.textContent = data.error || 'Fehler';
+        status.style.color = 'var(--error)';
+        status.style.display = 'inline';
+      }
+    } catch {
+      status.textContent = 'Verbindungsfehler';
+      status.style.color = 'var(--error)';
+      status.style.display = 'inline';
+    }
   });
 
   // ----------------------------------------------------------------
