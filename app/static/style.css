@@ -566,6 +566,11 @@ html, body {
   padding: 1.1rem 1.25rem 1.25rem;
 }
 
+.docs-table-wrapper {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .docs-table {
   width: 100%;
   border-collapse: collapse;

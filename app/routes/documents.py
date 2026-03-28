@@ -181,7 +181,7 @@ def _validate_file_content(file, ext: str) -> bool:
 def _get_document_list(docs_dir: Path) -> list[dict]:
     result = []
     for p in sorted(docs_dir.glob("**/*")):
-        if p.is_file() and p.suffix.lower() in {".pdf", ".txt", ".docx"}:
+        if p.is_file() and p.suffix.lower() in {".pdf", ".txt", ".docx", ".md"}:
             stat = p.stat()
             result.append({
                 "name": p.name,

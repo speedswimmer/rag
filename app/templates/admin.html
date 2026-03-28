@@ -35,6 +35,7 @@
   <section class="docs-section" style="margin-bottom:1.5rem">
     <h2 class="section-title">Indizierte Dokumente ({{ documents | length }})</h2>
     {% if documents %}
+      <div class="docs-table-wrapper">
       <table class="docs-table" id="docsTable">
         <thead>
           <tr>
@@ -62,6 +63,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     {% else %}
       <p class="empty-hint" id="emptyHint">Noch keine Dokumente vorhanden.</p>
     {% endif %}
