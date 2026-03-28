@@ -24,7 +24,7 @@ class Config:
 
     # Models
     embedding_model: str = field(
-        default_factory=lambda: os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        default_factory=lambda: os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
     )
     llm_model: str = field(
         default_factory=lambda: os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
