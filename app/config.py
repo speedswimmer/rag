@@ -21,6 +21,8 @@ class Config:
     docs_dir: Path = field(default=None)
     chroma_dir: Path = field(default=None)
     index_meta_path: Path = field(default=None)
+    backup_dir: Path = field(default=None)
+    backup_keep_days: int = 30
 
     # Models
     embedding_model: str = field(
@@ -55,6 +57,8 @@ class Config:
             self.chroma_dir = self.base_dir / "chroma_db"
         if self.index_meta_path is None:
             self.index_meta_path = self.base_dir / "index_meta.json"
+        if self.backup_dir is None:
+            self.backup_dir = self.base_dir / "backups"
 
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.chroma_dir.mkdir(parents=True, exist_ok=True)

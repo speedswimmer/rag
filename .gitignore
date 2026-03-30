@@ -1,4 +1,5 @@
 chroma_db/
+backups/
 venv/
 .env
 index_meta.json

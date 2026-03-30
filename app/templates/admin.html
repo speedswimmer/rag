@@ -94,6 +94,38 @@
     </div>
   </section>
 
+  <!-- Backup -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Backup</h2>
+    <table class="info-table" style="margin-bottom:1rem">
+      <tbody>
+        <tr>
+          <td class="info-key">Letzter Snapshot</td>
+          <td class="info-val">
+            {% if last_backup %}
+              {{ last_backup.mtime | int | timestamp_to_str }}
+              <span style="color:var(--text-muted);margin-left:.5rem">({{ last_backup.size_kb }} KB)</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="info-key">Gespeicherte Snapshots</td>
+          <td class="info-val">{{ last_backup.count if last_backup else 0 }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Aufbewahrung</td>
+          <td class="info-val">{{ cfg.backup_keep_days }} Tage</td>
+        </tr>
+      </tbody>
+    </table>
+    <div>
+      <button class="upload-btn" id="backupBtn">Snapshot jetzt erstellen</button>
+      <span class="upload-status" id="backupStatus" style="display:none"></span>
+    </div>
+  </section>
+
   <!-- App Settings -->
   <section class="info-section" style="margin-bottom:1.5rem">
     <h2 class="section-title">Einstellungen</h2>
@@ -272,6 +304,35 @@
       status.style.color = 'var(--error)';
       status.style.display = 'inline';
     }
+  });
+
+  // ----------------------------------------------------------------
+  // Manual backup
+  // ----------------------------------------------------------------
+  const backupBtn    = document.getElementById('backupBtn');
+  const backupStatus = document.getElementById('backupStatus');
+
+  backupBtn.addEventListener('click', async () => {
+    backupBtn.disabled = true;
+    backupStatus.textContent = 'Snapshot wird erstellt …';
+    backupStatus.className = 'upload-status';
+    backupStatus.style.display = 'flex';
+    try {
+      const resp = await fetch('/admin/backup', { method: 'POST', headers: { 'X-CSRFToken': csrfToken } });
+      const data = await resp.json();
+      if (resp.ok) {
+        backupStatus.textContent = 'Gespeichert: ' + data.name;
+        backupStatus.className = 'upload-status upload-status-done';
+        setTimeout(() => { backupStatus.style.display = 'none'; }, 5000);
+      } else {
+        backupStatus.textContent = data.error || 'Fehler';
+        backupStatus.className = 'upload-status upload-status-error';
+      }
+    } catch (err) {
+      backupStatus.textContent = 'Verbindungsfehler';
+      backupStatus.className = 'upload-status upload-status-error';
+    }
+    backupBtn.disabled = false;
   });
 
   // ----------------------------------------------------------------
