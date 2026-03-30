@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-APP_VERSION = "0.6"
+APP_VERSION = "0.7"
 
 
 @dataclass
