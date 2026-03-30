@@ -2,7 +2,7 @@
 """Standalone backup script — run via cron to create daily snapshots.
 
 Cron example (daily at 02:00):
-    0 2 * * * /home/jarvis/rag/venv/bin/python /home/jarvis/rag/backup_cron.py >> /home/jarvis/rag/backup.log 2>&1
+    0 */12 * * * /home/jarvis/rag/venv/bin/python /home/jarvis/rag/backup_cron.py >> /home/jarvis/rag/backup.log 2>&1
 """
 
 import sys

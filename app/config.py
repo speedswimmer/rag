@@ -22,7 +22,7 @@ class Config:
     chroma_dir: Path = field(default=None)
     index_meta_path: Path = field(default=None)
     backup_dir: Path = field(default=None)
-    backup_keep_days: int = 30
+    backup_keep_days: int = 7
 
     # Models
     embedding_model: str = field(
