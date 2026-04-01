@@ -2,6 +2,7 @@
 
 import logging
 import time
+from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
@@ -187,6 +188,76 @@ class RAGEngine:
             })
 
         return {"answer": result["result"], "sources": sources}
+
+    # ------------------------------------------------------------------
+    # Streaming query
+    # ------------------------------------------------------------------
+
+    def ask_stream(self, question: str) -> Generator[dict, None, None]:
+        """Stream answer tokens via SSE-compatible dicts.
+
+        Yields:
+            {"type": "sources", "data": [...]}   — once, before tokens
+            {"type": "token",   "data": "..."}   — per token
+            {"type": "done"}                     — when finished
+            {"type": "error",   "data": "..."}   — on failure
+        """
+        if self._vectorstore is None:
+            self._try_load_existing_index()
+
+        if self._vectorstore is None:
+            yield {"type": "error", "data": "Noch keine Dokumente indiziert. Bitte lade zuerst ein Dokument hoch."}
+            return
+
+        # 1. Retrieve relevant chunks
+        try:
+            docs = self._vectorstore.similarity_search(question, k=self.config.retrieval_k)
+        except Exception:
+            logger.exception("Retrieval failed")
+            yield {"type": "error", "data": "Fehler bei der Dokumentensuche."}
+            return
+
+        # 2. Build sources and send them first
+        sources = []
+        for doc in docs:
+            sources.append({
+                "source": Path(doc.metadata.get("source", "unbekannt")).name,
+                "page": doc.metadata.get("page", "?"),
+            })
+        yield {"type": "sources", "data": sources}
+
+        # 3. Build prompt from template
+        context = "\n\n".join(doc.page_content for doc in docs)
+        prompt_text = _RAG_PROMPT.format(context=context, question=question)
+
+        # 4. Stream LLM response with retry on overload
+        llm = ChatAnthropic(
+            model=self.config.llm_model,
+            max_tokens=self.config.llm_max_tokens,
+            temperature=self.config.llm_temperature,
+        )
+
+        last_exc: Exception | None = None
+        for attempt, delay in enumerate([0, 5, 15]):
+            if delay:
+                logger.info("Retrying stream after %ds (attempt %d/3) …", delay, attempt + 1)
+                time.sleep(delay)
+            try:
+                for chunk in llm.stream(prompt_text):
+                    token = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if token:
+                        yield {"type": "token", "data": token}
+                yield {"type": "done"}
+                return
+            except Exception as exc:
+                last_exc = exc
+                msg = str(exc).lower()
+                if "overloaded" not in msg and "529" not in msg:
+                    yield {"type": "error", "data": _friendly_api_error(exc)}
+                    return
+                logger.warning("API overloaded (attempt %d/3)", attempt + 1)
+
+        yield {"type": "error", "data": _friendly_api_error(last_exc)}
 
     # ------------------------------------------------------------------
     # Internal helpers

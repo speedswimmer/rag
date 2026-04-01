@@ -124,7 +124,7 @@ function scrollToBottom() {
 }
 
 // ------------------------------------------------------------------
-// Form submission
+// Form submission (SSE streaming)
 // ------------------------------------------------------------------
 
 chatForm.addEventListener('submit', async (e) => {
@@ -148,6 +148,12 @@ chatForm.addEventListener('submit', async (e) => {
   // Loading indicator
   const loadingEl = addLoadingIndicator();
 
+  // Prepare streaming bubble
+  let rawText = '';
+  let sources = null;
+  let assistantWrapper = null;
+  let bubble = null;
+
   try {
     const resp = await fetch('/ask', {
       method: 'POST',
@@ -158,18 +164,74 @@ chatForm.addEventListener('submit', async (e) => {
       body: JSON.stringify({ question }),
     });
 
-    const data = await resp.json();
-    loadingEl.remove();
-
-    if (!resp.ok || data.error) {
-      appendMessage('assistant', `Fehler: ${data.error || resp.statusText}`, null);
-    } else {
-      appendMessage('assistant', data.answer, data.sources);
-      history.push({ role: 'assistant', content: data.answer, sources: data.sources });
+    if (!resp.ok) {
+      loadingEl.remove();
+      const errData = await resp.json().catch(() => null);
+      appendMessage('assistant', `Fehler: ${errData?.error || resp.statusText}`, null);
+      saveHistory(history);
+      setLoading(false);
+      questionInput.focus();
+      return;
     }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const event = JSON.parse(line.slice(6));
+
+        if (event.type === 'sources') {
+          sources = event.data;
+        } else if (event.type === 'token') {
+          if (!assistantWrapper) {
+            loadingEl.remove();
+            assistantWrapper = document.createElement('div');
+            assistantWrapper.className = 'message message-assistant';
+            bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            assistantWrapper.appendChild(bubble);
+            if (_currentExchange) {
+              _currentExchange.appendChild(assistantWrapper);
+            } else {
+              chatMessages.appendChild(assistantWrapper);
+            }
+          }
+          rawText += event.data;
+          bubble.textContent = rawText;
+          scrollToBottom();
+        } else if (event.type === 'done') {
+          // Render final markdown
+          if (bubble && typeof marked !== 'undefined') {
+            bubble.innerHTML = marked.parse(rawText);
+          }
+          // Append sources
+          if (sources && sources.length > 0 && assistantWrapper) {
+            assistantWrapper.appendChild(buildSources(sources));
+          }
+          scrollToBottom();
+        } else if (event.type === 'error') {
+          loadingEl.remove();
+          appendMessage('assistant', `Fehler: ${event.data}`, null);
+        }
+      }
+    }
+
+    history.push({ role: 'assistant', content: rawText, sources: sources });
   } catch (err) {
     loadingEl.remove();
-    appendMessage('assistant', `Verbindungsfehler: ${err.message}`, null);
+    if (!assistantWrapper) {
+      appendMessage('assistant', `Verbindungsfehler: ${err.message}`, null);
+    }
   }
 
   saveHistory(history);

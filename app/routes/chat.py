@@ -1,8 +1,9 @@
-"""Chat routes — GET / renders the UI, POST /ask handles questions."""
+"""Chat routes — GET / renders the UI, POST /ask streams answers via SSE."""
 
+import json
 import logging
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request
 
 from app import get_rag_engine
 
@@ -29,11 +30,10 @@ def ask():
     if len(question) > _MAX_QUESTION_LENGTH:
         return jsonify({"error": f"Frage zu lang (maximal {_MAX_QUESTION_LENGTH} Zeichen)"}), 400
 
-    logger.info("Question received: %s", question[:80])
-    try:
-        result = get_rag_engine().ask(question)
-    except Exception:
-        logger.exception("Error during RAG query")
-        return jsonify({"error": "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen."}), 500
+    logger.info("Question received (stream): %s", question[:80])
 
-    return jsonify(result)
+    def generate():
+        for event in get_rag_engine().ask_stream(question):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
