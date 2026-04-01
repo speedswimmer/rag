@@ -2,6 +2,7 @@
 
 import logging
 import os
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -11,7 +12,21 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-APP_VERSION = "0.7"
+
+def _get_version() -> str:
+    """Read version from latest git tag (e.g. 'v0.8' -> '0.8')."""
+    try:
+        out = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return out.lstrip("v")
+    except Exception:
+        return "dev"
+
+
+APP_VERSION = _get_version()
 
 
 @dataclass
