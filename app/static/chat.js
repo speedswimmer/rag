@@ -43,7 +43,11 @@ function appendMessage(role, content, sources) {
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
-  bubble.textContent = content;
+  if (role === 'assistant' && typeof marked !== 'undefined') {
+    bubble.innerHTML = marked.parse(content);
+  } else {
+    bubble.textContent = content;
+  }
 
   if (sources && sources.length > 0) {
     wrapper.appendChild(bubble);

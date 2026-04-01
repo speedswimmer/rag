@@ -232,6 +232,98 @@ html, body {
   box-shadow: none;
 }
 
+/* Markdown rendering in assistant bubbles */
+.message-assistant .message-bubble h1,
+.message-assistant .message-bubble h2,
+.message-assistant .message-bubble h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: .8rem 0 .3rem;
+  color: var(--text);
+}
+.message-assistant .message-bubble h1 { font-size: 1.1rem; }
+.message-assistant .message-bubble h1:first-child,
+.message-assistant .message-bubble h2:first-child,
+.message-assistant .message-bubble h3:first-child { margin-top: 0; }
+
+.message-assistant .message-bubble p { margin: .4rem 0; }
+.message-assistant .message-bubble p:first-child { margin-top: 0; }
+.message-assistant .message-bubble p:last-child  { margin-bottom: 0; }
+
+.message-assistant .message-bubble ul,
+.message-assistant .message-bubble ol {
+  margin: .4rem 0;
+  padding-left: 1.4rem;
+}
+.message-assistant .message-bubble li { margin: .15rem 0; }
+.message-assistant .message-bubble li::marker { color: var(--text-muted); }
+
+.message-assistant .message-bubble strong { color: #fff; font-weight: 600; }
+.message-assistant .message-bubble em { font-style: italic; color: var(--text-muted); }
+
+.message-assistant .message-bubble a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.message-assistant .message-bubble a:hover { color: var(--accent-hover); }
+
+.message-assistant .message-bubble code {
+  background: var(--bg-input);
+  padding: .15rem .4rem;
+  border-radius: 4px;
+  font-size: .85em;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+}
+
+.message-assistant .message-bubble pre {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  margin: .5rem 0;
+  overflow-x: auto;
+}
+.message-assistant .message-bubble pre code {
+  background: none;
+  padding: 0;
+  font-size: .85em;
+}
+
+.message-assistant .message-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: .5rem 0;
+  font-size: .85em;
+}
+.message-assistant .message-bubble th,
+.message-assistant .message-bubble td {
+  padding: .4rem .6rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.message-assistant .message-bubble th {
+  background: var(--bg-input);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.message-assistant .message-bubble tr:nth-child(even) td {
+  background: rgba(255,255,255,.02);
+}
+
+.message-assistant .message-bubble blockquote {
+  border-left: 3px solid var(--accent);
+  padding: .3rem 0 .3rem .8rem;
+  margin: .5rem 0;
+  color: var(--text-muted);
+}
+
+.message-assistant .message-bubble hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: .6rem 0;
+}
+
 /* Sources accordion */
 .sources {
   margin-top: .7rem;
