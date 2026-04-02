@@ -390,6 +390,11 @@ chatForm.addEventListener('submit', async (e) => {
 
         if (event.type === 'message_id') {
           currentMessageId = event.data;
+          // message_id arrives after done, so add feedback row now
+          if (assistantWrapper) {
+            assistantWrapper.appendChild(buildFeedbackRow(currentMessageId, null));
+            scrollToBottom();
+          }
         } else if (event.type === 'sources') {
           sources = event.data;
         } else if (event.type === 'token') {
@@ -415,9 +420,6 @@ chatForm.addEventListener('submit', async (e) => {
           }
           if (sources && sources.length > 0 && assistantWrapper) {
             assistantWrapper.appendChild(buildSources(sources));
-          }
-          if (currentMessageId && assistantWrapper) {
-            assistantWrapper.appendChild(buildFeedbackRow(currentMessageId, null));
           }
           scrollToBottom();
           // Refresh sidebar to show updated title/time
