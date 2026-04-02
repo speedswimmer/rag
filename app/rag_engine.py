@@ -202,7 +202,7 @@ class RAGEngine:
     # Streaming query
     # ------------------------------------------------------------------
 
-    def ask_stream(self, question: str) -> Generator[dict, None, None]:
+    def ask_stream(self, question: str, history: list[dict] | None = None) -> Generator[dict, None, None]:
         """Stream answer tokens via SSE-compatible dicts.
 
         Yields:
@@ -239,7 +239,20 @@ class RAGEngine:
         context = "\n\n".join(doc.page_content for doc in docs)
         prompt_text = _RAG_PROMPT.format(context=context, question=question)
 
-        # 4. Stream LLM response with retry on overload
+        # 4. Build message list with conversation history
+        messages = []
+        if history:
+            for msg in history:
+                role = msg["role"]
+                if role == "user":
+                    messages.append(("human", msg["content"]))
+                elif role == "assistant":
+                    messages.append(("ai", msg["content"]))
+
+        # Current question with RAG context is the final human message
+        messages.append(("human", prompt_text))
+
+        # 5. Stream LLM response with retry on overload
         llm = ChatAnthropic(
             model=self.config.llm_model,
             max_tokens=self.config.llm_max_tokens,
@@ -252,7 +265,7 @@ class RAGEngine:
                 logger.info("Retrying stream after %ds (attempt %d/3) …", delay, attempt + 1)
                 time.sleep(delay)
             try:
-                for chunk in llm.stream(prompt_text):
+                for chunk in llm.stream(messages):
                     token = chunk.content if hasattr(chunk, "content") else str(chunk)
                     if token:
                         yield {"type": "token", "data": token}
