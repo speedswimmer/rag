@@ -3,7 +3,7 @@
 import json
 import logging
 
-from flask import Blueprint, Response, g, jsonify, render_template, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, jsonify, render_template, request, stream_with_context
 
 from app import get_rag_engine
 from app.database import db
@@ -49,7 +49,7 @@ def ask():
     db.session.commit()
 
     # Load conversation history for context
-    cfg = request.app.config.get("RAG_CONFIG")
+    cfg = current_app.config.get("RAG_CONFIG")
     context_limit = cfg.context_messages if cfg else 5
     history = _load_history(conversation_id, context_limit)
 
