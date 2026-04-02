@@ -1,4 +1,4 @@
-/* Chat UI logic — history stored in sessionStorage, no server-side state */
+/* Chat UI — persistent history via server API */
 
 'use strict';
 
@@ -7,28 +7,206 @@ const chatForm      = document.getElementById('chatForm');
 const questionInput = document.getElementById('questionInput');
 const sendBtn       = document.getElementById('sendBtn');
 const charCounter   = document.getElementById('charCounter');
-const STORAGE_KEY   = 'rag_chat_history';
+const sidebarList   = document.getElementById('sidebarList');
+const newChatBtn    = document.getElementById('newChatBtn');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebar       = document.getElementById('sidebar');
+const sidebarOverlay= document.getElementById('sidebarOverlay');
+const welcomeMsg    = document.getElementById('welcomeMsg');
 const MAX_LENGTH    = 2000;
 const CSRF_TOKEN    = document.querySelector('meta[name="csrf-token"]').content;
 
+let currentConversationId = null;
+
 // ------------------------------------------------------------------
-// Session history
+// Sidebar toggle (mobile)
 // ------------------------------------------------------------------
 
-function loadHistory() {
+if (sidebarToggle) {
+  sidebarToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    sidebarOverlay.classList.toggle('open');
+  });
+}
+
+if (sidebarOverlay) {
+  sidebarOverlay.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('open');
+  });
+}
+
+// ------------------------------------------------------------------
+// API helpers
+// ------------------------------------------------------------------
+
+async function apiGet(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(resp.statusText);
+  return resp.json();
+}
+
+async function apiPost(url, body) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || resp.statusText);
+  }
+  return resp;
+}
+
+async function apiDelete(url) {
+  const resp = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'X-CSRFToken': CSRF_TOKEN },
+  });
+  if (!resp.ok) throw new Error(resp.statusText);
+}
+
+// ------------------------------------------------------------------
+// Sidebar — conversation list
+// ------------------------------------------------------------------
+
+async function loadConversations() {
   try {
-    return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
+    const convs = await apiGet('/conversations');
+    renderSidebar(convs);
+  } catch (err) {
+    console.error('Failed to load conversations:', err);
   }
 }
 
-function saveHistory(history) {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  } catch {
-    // sessionStorage full — silently ignore
+function renderSidebar(convs) {
+  sidebarList.innerHTML = '';
+  if (convs.length === 0) {
+    sidebarList.innerHTML = '<div class="sidebar-empty">Noch keine Unterhaltungen</div>';
+    return;
   }
+  convs.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'sidebar-item' + (c.id === currentConversationId ? ' active' : '');
+    item.dataset.id = c.id;
+
+    const title = document.createElement('span');
+    title.className = 'sidebar-item-title';
+    title.textContent = c.title;
+
+    const date = document.createElement('span');
+    date.className = 'sidebar-item-date';
+    date.textContent = relativeDate(c.updated_at);
+
+    const del = document.createElement('button');
+    del.className = 'sidebar-item-delete';
+    del.type = 'button';
+    del.innerHTML = '&#x1F5D1;';
+    del.title = 'Löschen';
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Unterhaltung löschen?')) return;
+      try {
+        await apiDelete('/conversations/' + c.id);
+        if (currentConversationId === c.id) {
+          currentConversationId = null;
+          clearChat();
+        }
+        loadConversations();
+      } catch (err) {
+        console.error('Delete failed:', err);
+      }
+    });
+
+    item.appendChild(title);
+    item.appendChild(date);
+    item.appendChild(del);
+    item.addEventListener('click', () => openConversation(c.id));
+    sidebarList.appendChild(item);
+  });
+}
+
+function relativeDate(isoStr) {
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffD = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return 'jetzt';
+  if (diffMin < 60) return diffMin + ' Min.';
+  if (diffH < 24) return diffH + ' Std.';
+  if (diffD < 7) return diffD + (diffD === 1 ? ' Tag' : ' Tage');
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
+// ------------------------------------------------------------------
+// Conversation management
+// ------------------------------------------------------------------
+
+async function openConversation(id) {
+  currentConversationId = id;
+  clearChat();
+
+  // Close mobile sidebar
+  sidebar.classList.remove('open');
+  sidebarOverlay.classList.remove('open');
+
+  // Mark active
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+
+  try {
+    const msgs = await apiGet('/conversations/' + id + '/messages');
+    if (msgs.length === 0) {
+      showWelcome();
+      return;
+    }
+    hideWelcome();
+    msgs.forEach(m => appendMessage(m.role, m.content, m.sources));
+  } catch (err) {
+    console.error('Failed to load messages:', err);
+  }
+}
+
+function startNewChat() {
+  currentConversationId = null;
+  clearChat();
+  showWelcome();
+
+  // Clear active state in sidebar
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+
+  // Close mobile sidebar
+  sidebar.classList.remove('open');
+  sidebarOverlay.classList.remove('open');
+
+  questionInput.focus();
+}
+
+newChatBtn.addEventListener('click', startNewChat);
+
+function clearChat() {
+  chatMessages.innerHTML = '';
+  _currentExchange = null;
+}
+
+function showWelcome() {
+  if (!document.getElementById('welcomeMsg')) {
+    const div = document.createElement('div');
+    div.className = 'message message-system';
+    div.id = 'welcomeMsg';
+    div.innerHTML = '<div class="message-bubble">Wie kann ich dir helfen?</div>';
+    chatMessages.appendChild(div);
+  }
+}
+
+function hideWelcome() {
+  const el = document.getElementById('welcomeMsg');
+  if (el) el.remove();
 }
 
 // ------------------------------------------------------------------
@@ -56,7 +234,6 @@ function appendMessage(role, content, sources) {
     wrapper.appendChild(bubble);
   }
 
-  // Group user question + assistant answer into one exchange block
   if (role === 'user') {
     _currentExchange = document.createElement('div');
     _currentExchange.className = 'exchange';
@@ -133,22 +310,29 @@ chatForm.addEventListener('submit', async (e) => {
   const question = questionInput.value.trim();
   if (!question) return;
 
-  // Clear input and lock UI
   questionInput.value = '';
   autoResize(questionInput);
   setLoading(true);
+  hideWelcome();
 
-  // Add user message
+  // Create conversation if needed
+  if (!currentConversationId) {
+    try {
+      const resp = await apiPost('/conversations', { title: question.slice(0, 50) });
+      const data = await resp.json();
+      currentConversationId = data.id;
+      loadConversations();
+    } catch (err) {
+      appendMessage('assistant', 'Fehler beim Erstellen der Unterhaltung: ' + err.message, null);
+      setLoading(false);
+      return;
+    }
+  }
+
   appendMessage('user', question, null);
 
-  // Persist to session history
-  const history = loadHistory();
-  history.push({ role: 'user', content: question });
-
-  // Loading indicator
   const loadingEl = addLoadingIndicator();
 
-  // Prepare streaming bubble
   let rawText = '';
   let sources = null;
   let assistantWrapper = null;
@@ -161,14 +345,13 @@ chatForm.addEventListener('submit', async (e) => {
         'Content-Type': 'application/json',
         'X-CSRFToken': CSRF_TOKEN,
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, conversation_id: currentConversationId }),
     });
 
     if (!resp.ok) {
       loadingEl.remove();
       const errData = await resp.json().catch(() => null);
       appendMessage('assistant', `Fehler: ${errData?.error || resp.statusText}`, null);
-      saveHistory(history);
       setLoading(false);
       questionInput.focus();
       return;
@@ -184,7 +367,7 @@ chatForm.addEventListener('submit', async (e) => {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line
+      buffer = lines.pop();
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
@@ -215,23 +398,21 @@ chatForm.addEventListener('submit', async (e) => {
           bubble.textContent = rawText;
           scrollToBottom();
         } else if (event.type === 'done') {
-          // Render final markdown
           if (bubble && typeof marked !== 'undefined') {
             bubble.innerHTML = DOMPurify.sanitize(marked.parse(rawText));
           }
-          // Append sources
           if (sources && sources.length > 0 && assistantWrapper) {
             assistantWrapper.appendChild(buildSources(sources));
           }
           scrollToBottom();
+          // Refresh sidebar to show updated title/time
+          loadConversations();
         } else if (event.type === 'error') {
           loadingEl.remove();
           appendMessage('assistant', `Fehler: ${event.data}`, null);
         }
       }
     }
-
-    history.push({ role: 'assistant', content: rawText, sources: sources });
   } catch (err) {
     loadingEl.remove();
     if (!assistantWrapper) {
@@ -239,7 +420,6 @@ chatForm.addEventListener('submit', async (e) => {
     }
   }
 
-  saveHistory(history);
   setLoading(false);
   questionInput.focus();
 });
@@ -249,19 +429,6 @@ function setLoading(loading) {
   sendBtn.querySelector('.btn-text').classList.toggle('hidden', loading);
   sendBtn.querySelector('.btn-spinner').classList.toggle('hidden', !loading);
 }
-
-// ------------------------------------------------------------------
-// Restore session history on page load
-// ------------------------------------------------------------------
-
-(function restoreHistory() {
-  const history = loadHistory();
-  history.forEach((entry) => {
-    if (entry.role === 'user' || entry.role === 'assistant') {
-      appendMessage(entry.role, entry.content, entry.sources || null);
-    }
-  });
-})();
 
 // ------------------------------------------------------------------
 // Auto-resize textarea
@@ -284,10 +451,15 @@ function updateCharCounter() {
   charCounter.classList.toggle('limit', len >= MAX_LENGTH);
 }
 
-// Submit on Enter, newline on Shift+Enter
 questionInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
   }
 });
+
+// ------------------------------------------------------------------
+// Init
+// ------------------------------------------------------------------
+
+loadConversations();
