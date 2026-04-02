@@ -25,6 +25,31 @@ def save_app_name(name: str) -> None:
     logger.info("App name updated to: %s", name)
 
 
+_DEFAULT_SYSTEM_PROMPT = (
+    "Du bist ein hilfreicher Assistent, der Fragen ausschließlich anhand der "
+    "bereitgestellten Dokumente beantwortet.\n\n"
+    "Antworte immer in derselben Sprache, in der die Frage gestellt wurde.\n\n"
+    "Beginne deine Antwort NIE mit Formulierungen wie 'Basierend auf', "
+    "'Laut den Dokumenten', 'Den bereitgestellten Informationen zufolge', "
+    "'Aus den Unterlagen', 'Gemäß' oder ähnlichen einleitenden Floskeln. "
+    "Beantworte die Frage direkt, als würdest du das Wissen einfach kennen. "
+    "Falls die Antwort nicht im Kontext enthalten ist, teile das dem Nutzer klar mit."
+)
+
+
+def get_system_prompt() -> str:
+    """Return system prompt: settings.json → default."""
+    prompt = _load().get("system_prompt", "").strip()
+    return prompt if prompt else _DEFAULT_SYSTEM_PROMPT
+
+
+def save_system_prompt(prompt: str) -> None:
+    settings = _load()
+    settings["system_prompt"] = prompt.strip()
+    _save(settings)
+    logger.info("System prompt updated (%d chars)", len(prompt.strip()))
+
+
 def _load() -> dict:
     try:
         with open(_SETTINGS_PATH, encoding="utf-8") as f:

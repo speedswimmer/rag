@@ -140,6 +140,24 @@
     </div>
   </section>
 
+  <!-- System Prompt -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">System-Prompt</h2>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
+      Definiert Persönlichkeit und Verhalten des Assistenten. Wird bei jeder Anfrage als System-Nachricht an das LLM gesendet.
+    </p>
+    <textarea id="systemPromptInput" maxlength="5000" rows="8"
+              style="width:100%;background:var(--bg-input);border:1px solid var(--border-light);color:var(--text);
+                     border-radius:var(--radius);padding:.65rem .85rem;font-size:.875rem;font-family:inherit;
+                     resize:vertical;min-height:120px;outline:none;line-height:1.6;"
+    >{{ system_prompt }}</textarea>
+    <div style="display:flex;gap:.75rem;align-items:center;margin-top:.75rem;flex-wrap:wrap">
+      <button class="upload-btn" id="savePromptBtn" style="margin-top:0">Speichern</button>
+      <span id="savePromptStatus" style="font-size:.875rem;display:none"></span>
+      <span style="font-size:.75rem;color:var(--text-dim);margin-left:auto" id="promptCharCount"></span>
+    </div>
+  </section>
+
   <!-- System info -->
   <section class="info-section">
     <h2 class="section-title">System</h2>
@@ -293,6 +311,47 @@
         status.style.color = 'var(--success)';
         status.style.display = 'inline';
         document.title = name;
+        setTimeout(() => { status.style.display = 'none'; }, 3000);
+      } else {
+        status.textContent = data.error || 'Fehler';
+        status.style.color = 'var(--error)';
+        status.style.display = 'inline';
+      }
+    } catch {
+      status.textContent = 'Verbindungsfehler';
+      status.style.color = 'var(--error)';
+      status.style.display = 'inline';
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Save system prompt
+  // ----------------------------------------------------------------
+  const promptInput = document.getElementById('systemPromptInput');
+  const promptCount = document.getElementById('promptCharCount');
+
+  function updatePromptCount() {
+    promptCount.textContent = promptInput.value.length + ' / 5000';
+  }
+  promptInput.addEventListener('input', updatePromptCount);
+  updatePromptCount();
+
+  document.getElementById('savePromptBtn').addEventListener('click', async () => {
+    const status = document.getElementById('savePromptStatus');
+    const prompt = promptInput.value.trim();
+    if (!prompt) return;
+
+    try {
+      const resp = await fetch('/admin/system-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ system_prompt: prompt }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        status.textContent = 'Gespeichert';
+        status.style.color = 'var(--success)';
+        status.style.display = 'inline';
         setTimeout(() => { status.style.display = 'none'; }, 3000);
       } else {
         status.textContent = data.error || 'Fehler';

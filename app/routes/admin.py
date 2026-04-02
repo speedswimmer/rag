@@ -10,7 +10,7 @@ from app import get_rag_engine
 from app.backup import create_snapshot, get_last_backup
 from app.config import APP_VERSION
 from app.routes.documents import _get_document_list, _run_index_in_background
-from app.settings import get_app_name, save_app_name
+from app.settings import get_app_name, get_system_prompt, save_app_name, save_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ def admin():
         chunk_count=_get_chunk_count(),
         last_index=_get_last_index_time(cfg),
         last_backup=get_last_backup(cfg.backup_dir),
+        system_prompt=get_system_prompt(),
     )
 
 
@@ -62,6 +63,17 @@ def save_settings():
     if len(name) > 60:
         return jsonify({"error": "Name zu lang (max. 60 Zeichen)"}), 400
     save_app_name(name)
+    return jsonify({"ok": True})
+
+
+@admin_bp.post("/admin/system-prompt")
+def save_system_prompt_route():
+    prompt = (request.json or {}).get("system_prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "System-Prompt darf nicht leer sein"}), 400
+    if len(prompt) > 5000:
+        return jsonify({"error": "System-Prompt zu lang (max. 5000 Zeichen)"}), 400
+    save_system_prompt(prompt)
     return jsonify({"ok": True})
 
 
