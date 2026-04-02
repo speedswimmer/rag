@@ -36,7 +36,7 @@ def admin():
 def rebuild():
     cfg = current_app.config["RAG_CONFIG"]
     try:
-        create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days)
+        create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days, chat_db_path=cfg.chat_db_path)
     except Exception:
         logger.exception("Snapshot before rebuild failed — continuing anyway")
     threading.Thread(target=_run_index_in_background, daemon=True).start()
@@ -47,7 +47,7 @@ def rebuild():
 def backup():
     cfg = current_app.config["RAG_CONFIG"]
     try:
-        path = create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days)
+        path = create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days, chat_db_path=cfg.chat_db_path)
         return jsonify({"ok": True, "name": path.name})
     except Exception:
         logger.exception("Manual snapshot failed")

@@ -14,5 +14,5 @@ from app.backup import create_snapshot
 from app.config import Config
 
 cfg = Config()
-path = create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days)
+path = create_snapshot(cfg.docs_dir, cfg.backup_dir, cfg.backup_keep_days, chat_db_path=cfg.chat_db_path)
 print(f"Backup created: {path}")

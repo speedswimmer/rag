@@ -8,14 +8,16 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def create_snapshot(docs_dir: Path, backup_dir: Path, keep_days: int = 30) -> Path:
-    """Create a timestamped tar.gz of docs_dir, rotate backups older than keep_days."""
+def create_snapshot(docs_dir: Path, backup_dir: Path, keep_days: int = 30, chat_db_path: Path | None = None) -> Path:
+    """Create a timestamped tar.gz of docs_dir (and optionally chat.db), rotate old backups."""
     backup_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     archive_path = backup_dir / f"dokumente-{timestamp}.tar.gz"
 
     with tarfile.open(archive_path, "w:gz") as tar:
         tar.add(docs_dir, arcname="dokumente")
+        if chat_db_path and chat_db_path.exists():
+            tar.add(chat_db_path, arcname="chat.db")
 
     logger.info("Snapshot created: %s", archive_path.name)
     _rotate(backup_dir, keep_days)
