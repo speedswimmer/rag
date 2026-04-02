@@ -66,23 +66,30 @@ def ask():
 
         # Save assistant message after streaming completes
         if full_answer:
-            assistant_msg = Message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=full_answer,
-                sources=json.dumps(sources_data, ensure_ascii=False) if sources_data else None,
-            )
-            db.session.add(assistant_msg)
+            try:
+                assistant_msg = Message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=full_answer,
+                    sources=json.dumps(sources_data, ensure_ascii=False) if sources_data else None,
+                )
+                db.session.add(assistant_msg)
 
-            # Update conversation title from first question if still default
-            if conv.title == "Neue Unterhaltung":
-                conv.title = question[:50]
+                # Update conversation title from first question if still default
+                if conv.title == "Neue Unterhaltung":
+                    conv.title = question[:50]
 
-            # Touch updated_at so sidebar sorts correctly
-            from datetime import datetime, timezone
-            conv.updated_at = datetime.now(timezone.utc)
+                # Touch updated_at so sidebar sorts correctly
+                from datetime import datetime, timezone
+                conv.updated_at = datetime.now(timezone.utc)
 
-            db.session.commit()
+                db.session.commit()
+                logger.info("Saved assistant message (%d chars) to conversation %s", len(full_answer), conversation_id)
+            except Exception:
+                logger.exception("Failed to save assistant message")
+                db.session.rollback()
+        else:
+            logger.warning("No answer generated — nothing to save")
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
