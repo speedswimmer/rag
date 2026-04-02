@@ -39,6 +39,12 @@ class Config:
     backup_dir: Path = field(default=None)
     backup_keep_days: int = 7
 
+    # Chat history
+    chat_db_path: Path = field(default=None)
+    context_messages: int = field(
+        default_factory=lambda: int(os.getenv("CONTEXT_MESSAGES", "5"))
+    )
+
     # Models
     embedding_model: str = field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
@@ -74,6 +80,8 @@ class Config:
             self.index_meta_path = self.base_dir / "index_meta.json"
         if self.backup_dir is None:
             self.backup_dir = self.base_dir / "backups"
+        if self.chat_db_path is None:
+            self.chat_db_path = self.base_dir / "chat.db"
 
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.chroma_dir.mkdir(parents=True, exist_ok=True)
