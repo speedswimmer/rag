@@ -1,4 +1,5 @@
 chroma_db/
+chat.db
 backups/
 venv/
 .env

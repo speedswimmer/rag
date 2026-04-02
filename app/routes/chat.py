@@ -78,6 +78,10 @@ def ask():
             if conv.title == "Neue Unterhaltung":
                 conv.title = question[:50]
 
+            # Touch updated_at so sidebar sorts correctly
+            from datetime import datetime, timezone
+            conv.updated_at = datetime.now(timezone.utc)
+
             db.session.commit()
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
