@@ -240,7 +240,11 @@ function appendMessage(role, content, sources, messageId, feedback) {
 
   // Feedback row for assistant messages with a known ID
   if (role === 'assistant' && messageId) {
-    wrapper.appendChild(buildFeedbackRow(messageId, feedback));
+    try {
+      wrapper.appendChild(buildFeedbackRow(messageId, feedback));
+    } catch (err) {
+      console.error('Failed to build feedback row:', err);
+    }
   }
 
   if (role === 'user') {
@@ -392,8 +396,12 @@ chatForm.addEventListener('submit', async (e) => {
           currentMessageId = event.data;
           // message_id arrives after done, so add feedback row now
           if (assistantWrapper) {
-            assistantWrapper.appendChild(buildFeedbackRow(currentMessageId, null));
-            scrollToBottom();
+            try {
+              assistantWrapper.appendChild(buildFeedbackRow(currentMessageId, null));
+              scrollToBottom();
+            } catch (err) {
+              console.error('Failed to build feedback row:', err);
+            }
           }
         } else if (event.type === 'sources') {
           sources = event.data;
