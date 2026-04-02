@@ -2,13 +2,15 @@
 
 import logging
 import os
+import uuid
 
-from flask import Flask
+from flask import Flask, g, request as flask_request
 from flask_wtf.csrf import CSRFProtect
 
 _csrf = CSRFProtect()
 
 from app.config import Config
+from app.database import db
 from app.indexer import IndexManager
 from app.rag_engine import RAGEngine
 
@@ -44,6 +46,15 @@ def create_app(config: Config | None = None) -> Flask:
 
     _csrf.init_app(app)
 
+    # Database
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{cfg.chat_db_path}"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    db.init_app(app)
+
+    with app.app_context():
+        from app import models  # noqa: F401 — registers models with SQLAlchemy
+        db.create_all()
+
     if not os.getenv("ANTHROPIC_API_KEY"):
         logger.error("ANTHROPIC_API_KEY is not set — LLM calls will fail")
 
@@ -70,6 +81,39 @@ def create_app(config: Config | None = None) -> Flask:
     app.register_blueprint(documents_bp)
     app.register_blueprint(info_bp)
     app.register_blueprint(admin_bp)
+
+    from app.routes.conversations import conversations_bp
+    app.register_blueprint(conversations_bp)
+
+    # Anonymous session cookie
+    @app.before_request
+    def ensure_session_cookie():
+        sid = flask_request.cookies.get("rag_session_id")
+        if sid:
+            from app.models import Session as ChatSession
+            if not db.session.get(ChatSession, sid):
+                chat_session = ChatSession(id=sid)
+                db.session.add(chat_session)
+                db.session.commit()
+            g.session_id = sid
+        else:
+            g.session_id = str(uuid.uuid4())
+
+    @app.after_request
+    def set_session_cookie(response):
+        sid = getattr(g, "session_id", None)
+        if sid and "rag_session_id" not in flask_request.cookies:
+            from app.models import Session as ChatSession
+            chat_session = ChatSession(id=sid)
+            db.session.add(chat_session)
+            db.session.commit()
+            response.set_cookie(
+                "rag_session_id", sid,
+                max_age=365 * 24 * 3600,
+                httponly=True,
+                samesite="Lax",
+            )
+        return response
 
     # Jinja2 custom filter
     import datetime
