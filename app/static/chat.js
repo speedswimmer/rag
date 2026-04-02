@@ -167,7 +167,12 @@ async function openConversation(id) {
       return;
     }
     hideWelcome();
-    msgs.forEach(m => appendMessage(m.role, m.content, m.sources));
+    console.log('DEBUG: loaded messages:', msgs.length, msgs.map(m => m.role));
+    msgs.forEach(m => {
+      console.log('DEBUG: rendering', m.role, m.content?.substring(0, 40));
+      appendMessage(m.role, m.content, m.sources);
+      console.log('DEBUG: rendered OK');
+    });
   } catch (err) {
     console.error('Failed to load messages:', err);
   }
