@@ -143,6 +143,15 @@ class RAGEngine:
         logger.info("ChromaDB rebuilt with %d chunks", len(chunks))
         self._build_chain()
 
+    def chunk_count(self) -> int | None:
+        """Return the number of chunks in the vector store, or None if unavailable."""
+        try:
+            if self._vectorstore is not None:
+                return self._vectorstore._collection.count()
+        except Exception:
+            pass
+        return None
+
     # ------------------------------------------------------------------
     # Query
     # ------------------------------------------------------------------

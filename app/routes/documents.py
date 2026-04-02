@@ -68,7 +68,7 @@ def _run_index_in_background() -> None:
 @documents_bp.get("/documents")
 def list_documents():
     cfg = current_app.config["RAG_CONFIG"]
-    docs = _get_document_list(cfg.docs_dir)
+    docs = _get_document_list(cfg.docs_dir, cfg.allowed_extensions)
     return render_template("documents.html", documents=docs)
 
 
@@ -178,10 +178,11 @@ def _validate_file_content(file, ext: str) -> bool:
     return False
 
 
-def _get_document_list(docs_dir: Path) -> list[dict]:
+def _get_document_list(docs_dir: Path, allowed_extensions: frozenset | None = None) -> list[dict]:
     result = []
+    exts = {"." + ext for ext in allowed_extensions} if allowed_extensions else {".pdf", ".txt", ".docx", ".md"}
     for p in sorted(docs_dir.glob("**/*")):
-        if p.is_file() and p.suffix.lower() in {".pdf", ".txt", ".docx", ".md"}:
+        if p.is_file() and p.suffix.lower() in exts:
             stat = p.stat()
             result.append({
                 "name": p.name,

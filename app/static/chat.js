@@ -44,7 +44,7 @@ function appendMessage(role, content, sources) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
   if (role === 'assistant' && typeof marked !== 'undefined') {
-    bubble.innerHTML = marked.parse(content);
+    bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
   } else {
     bubble.textContent = content;
   }
@@ -188,7 +188,12 @@ chatForm.addEventListener('submit', async (e) => {
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
-        const event = JSON.parse(line.slice(6));
+        let event;
+        try {
+          event = JSON.parse(line.slice(6));
+        } catch {
+          continue;
+        }
 
         if (event.type === 'sources') {
           sources = event.data;
@@ -212,7 +217,7 @@ chatForm.addEventListener('submit', async (e) => {
         } else if (event.type === 'done') {
           // Render final markdown
           if (bubble && typeof marked !== 'undefined') {
-            bubble.innerHTML = marked.parse(rawText);
+            bubble.innerHTML = DOMPurify.sanitize(marked.parse(rawText));
           }
           // Append sources
           if (sources && sources.length > 0 && assistantWrapper) {

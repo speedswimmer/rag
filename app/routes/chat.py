@@ -3,7 +3,7 @@
 import json
 import logging
 
-from flask import Blueprint, Response, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
 
 from app import get_rag_engine
 
@@ -36,4 +36,4 @@ def ask():
         for event in get_rag_engine().ask_stream(question):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
-    return Response(generate(), mimetype="text/event-stream")
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")

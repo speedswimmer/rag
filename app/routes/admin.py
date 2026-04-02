@@ -20,7 +20,7 @@ admin_bp = Blueprint("admin", __name__)
 @admin_bp.get("/admin")
 def admin():
     cfg = current_app.config["RAG_CONFIG"]
-    docs = _get_document_list(cfg.docs_dir)
+    docs = _get_document_list(cfg.docs_dir, cfg.allowed_extensions)
     return render_template(
         "admin.html",
         documents=docs,
@@ -66,13 +66,7 @@ def save_settings():
 
 
 def _get_chunk_count() -> int | None:
-    try:
-        engine = get_rag_engine()
-        if engine._vectorstore is not None:
-            return engine._vectorstore._collection.count()
-    except Exception:
-        pass
-    return None
+    return get_rag_engine().chunk_count()
 
 
 def _get_last_index_time(cfg) -> str | None:
