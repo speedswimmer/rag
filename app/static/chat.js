@@ -148,6 +148,7 @@ function relativeDate(isoStr) {
 
 async function openConversation(id) {
   currentConversationId = id;
+  sessionStorage.setItem('activeConversation', id);
   clearChat();
 
   // Close mobile sidebar
@@ -174,6 +175,7 @@ async function openConversation(id) {
 
 function startNewChat() {
   currentConversationId = null;
+  sessionStorage.removeItem('activeConversation');
   clearChat();
   showWelcome();
 
@@ -463,3 +465,9 @@ questionInput.addEventListener('keydown', (e) => {
 // ------------------------------------------------------------------
 
 loadConversations();
+
+// Restore last active conversation after page navigation
+const savedConvId = sessionStorage.getItem('activeConversation');
+if (savedConvId) {
+  openConversation(savedConvId);
+}
