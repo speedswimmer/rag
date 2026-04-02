@@ -75,13 +75,14 @@ def ask():
                 )
                 db.session.add(assistant_msg)
 
-                # Update conversation title from first question if still default
-                if conv.title == "Neue Unterhaltung":
-                    conv.title = question[:50]
+                # Re-fetch conversation (original may be detached after long streaming)
+                fresh_conv = db.session.get(Conversation, conversation_id)
+                if fresh_conv:
+                    if fresh_conv.title == "Neue Unterhaltung":
+                        fresh_conv.title = question[:50]
 
-                # Touch updated_at so sidebar sorts correctly
-                from datetime import datetime, timezone
-                conv.updated_at = datetime.now(timezone.utc)
+                    from datetime import datetime, timezone
+                    fresh_conv.updated_at = datetime.now(timezone.utc)
 
                 db.session.commit()
                 logger.info("Saved assistant message (%d chars) to conversation %s", len(full_answer), conversation_id)
