@@ -158,6 +158,39 @@
     </div>
   </section>
 
+  <!-- Feedback -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Feedback</h2>
+    <div style="display:flex;gap:1.5rem;margin-bottom:1rem;font-size:.9rem">
+      <span>Gesamt: <strong id="fbTotal">&mdash;</strong></span>
+      <span style="color:var(--success)">&#x1F44D; <strong id="fbUp">&mdash;</strong></span>
+      <span style="color:var(--error)">&#x1F44E; <strong id="fbDown">&mdash;</strong></span>
+    </div>
+    <div style="margin-bottom:.75rem">
+      <select id="feedbackFilter"
+              style="background:var(--bg-input);border:1px solid var(--border-light);color:var(--text);
+                     border-radius:6px;padding:.35rem .6rem;font-size:.82rem;font-family:inherit;outline:none">
+        <option value="">Alle</option>
+        <option value="down">Nur negativ</option>
+      </select>
+    </div>
+    <div class="docs-table-wrapper">
+      <table class="docs-table" id="feedbackTable" style="display:none">
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Frage</th>
+            <th>Antwort</th>
+            <th>Bewertung</th>
+            <th>Kommentar</th>
+          </tr>
+        </thead>
+        <tbody id="feedbackBody"></tbody>
+      </table>
+    </div>
+    <p class="empty-hint" id="feedbackEmpty">Noch kein Feedback vorhanden.</p>
+  </section>
+
   <!-- System info -->
   <section class="info-section">
     <h2 class="section-title">System</h2>
@@ -393,6 +426,60 @@
     }
     backupBtn.disabled = false;
   });
+
+  // ----------------------------------------------------------------
+  // Feedback overview
+  // ----------------------------------------------------------------
+  const feedbackFilter = document.getElementById('feedbackFilter');
+  feedbackFilter.addEventListener('change', loadFeedback);
+
+  async function loadFeedback() {
+    const filter = feedbackFilter.value;
+    const url = '/admin/feedback' + (filter ? '?filter=' + filter : '');
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      document.getElementById('fbTotal').textContent = data.stats.total;
+      document.getElementById('fbUp').textContent = data.stats.up;
+      document.getElementById('fbDown').textContent = data.stats.down;
+
+      const tbody = document.getElementById('feedbackBody');
+      const table = document.getElementById('feedbackTable');
+      const empty = document.getElementById('feedbackEmpty');
+
+      if (data.items.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+
+      table.style.display = 'table';
+      empty.style.display = 'none';
+      tbody.innerHTML = '';
+
+      data.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escHtml(item.date) + '</td>' +
+          '<td>' + escHtml(item.question) + '</td>' +
+          '<td>' + escHtml(item.answer_preview) + '</td>' +
+          '<td>' + (item.rating === 'up' ? '&#x1F44D;' : '&#x1F44E;') + '</td>' +
+          '<td>' + (item.comment ? escHtml(item.comment) : '&mdash;') + '</td>';
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error('Failed to load feedback:', err);
+    }
+  }
+
+  function escHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  loadFeedback();
 
   // ----------------------------------------------------------------
   // Rebuild index

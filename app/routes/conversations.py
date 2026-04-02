@@ -78,6 +78,8 @@ def get_messages(conversation_id):
             "content": m.content,
             "sources": json.loads(m.sources) if m.sources else None,
             "created_at": m.created_at.isoformat(),
+            "feedback": {"rating": m.feedback.rating, "comment": m.feedback.comment}
+            if m.feedback else None,
         }
         for m in msgs
     ])
