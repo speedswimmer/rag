@@ -202,6 +202,47 @@ class RAGEngine:
     # Streaming query
     # ------------------------------------------------------------------
 
+    def _condense_question(self, question: str, history: list[dict]) -> str:
+        """Rephrase a follow-up question as a standalone question using conversation history.
+
+        If the question is already standalone, returns it unchanged.
+        """
+        chat_lines = []
+        for msg in history:
+            prefix = "Nutzer" if msg["role"] == "user" else "Assistent"
+            chat_lines.append(f"{prefix}: {msg['content']}")
+        chat_text = "\n".join(chat_lines)
+
+        condense_prompt = (
+            "Gegeben ist ein Chatverlauf und eine neue Frage des Nutzers. "
+            "Entscheide: Ist die neue Frage eine Rückfrage oder Bezugnahme auf den Chatverlauf, "
+            "oder eine eigenständige neue Frage?\n\n"
+            "- Wenn es eine Rückfrage ist (z.B. 'Erkläre das genauer', 'Welche davon?', "
+            "'Und was ist mit X?'), formuliere sie als eigenständige, vollständige Frage um, "
+            "die ohne den Chatverlauf verständlich ist.\n"
+            "- Wenn es eine eigenständige neue Frage ist, gib sie unverändert zurück.\n\n"
+            "Gib NUR die Frage zurück, ohne Erklärung oder Präfix.\n\n"
+            f"Chatverlauf:\n{chat_text}\n\n"
+            f"Neue Frage: {question}\n\n"
+            "Eigenständige Frage:"
+        )
+
+        try:
+            llm = ChatAnthropic(
+                model=self.config.llm_model,
+                max_tokens=256,
+                temperature=0.0,
+            )
+            result = llm.invoke(condense_prompt)
+            condensed = result.content.strip()
+            if condensed:
+                logger.info("Condensed question: '%s' -> '%s'", question[:60], condensed[:60])
+                return condensed
+        except Exception as exc:
+            logger.warning("Condense question failed, using original: %s", exc)
+
+        return question
+
     def ask_stream(self, question: str, history: list[dict] | None = None) -> Generator[dict, None, None]:
         """Stream answer tokens via SSE-compatible dicts.
 
@@ -218,15 +259,20 @@ class RAGEngine:
             yield {"type": "error", "data": "Noch keine Dokumente indiziert. Bitte lade zuerst ein Dokument hoch."}
             return
 
-        # 1. Retrieve relevant chunks
+        # 1. Condense follow-up questions into standalone questions
+        search_question = question
+        if history:
+            search_question = self._condense_question(question, history)
+
+        # 2. Retrieve relevant chunks using the condensed question
         try:
-            docs = self._vectorstore.similarity_search(question, k=self.config.retrieval_k)
+            docs = self._vectorstore.similarity_search(search_question, k=self.config.retrieval_k)
         except Exception:
             logger.exception("Retrieval failed")
             yield {"type": "error", "data": "Fehler bei der Dokumentensuche."}
             return
 
-        # 2. Build sources and send them first
+        # 3. Build sources and send them first
         sources = []
         for doc in docs:
             sources.append({
@@ -235,22 +281,9 @@ class RAGEngine:
             })
         yield {"type": "sources", "data": sources}
 
-        # 3. Build prompt from template
+        # 4. Build prompt — use condensed question, no history needed
         context = "\n\n".join(doc.page_content for doc in docs)
-        prompt_text = _RAG_PROMPT.format(context=context, question=question)
-
-        # 4. Build message list with conversation history
-        messages = []
-        if history:
-            for msg in history:
-                role = msg["role"]
-                if role == "user":
-                    messages.append(("human", msg["content"]))
-                elif role == "assistant":
-                    messages.append(("ai", msg["content"]))
-
-        # Current question with RAG context is the final human message
-        messages.append(("human", prompt_text))
+        prompt_text = _RAG_PROMPT.format(context=context, question=search_question)
 
         # 5. Stream LLM response with retry on overload
         llm = ChatAnthropic(
@@ -265,7 +298,7 @@ class RAGEngine:
                 logger.info("Retrying stream after %ds (attempt %d/3) …", delay, attempt + 1)
                 time.sleep(delay)
             try:
-                for chunk in llm.stream(messages):
+                for chunk in llm.stream(prompt_text):
                     token = chunk.content if hasattr(chunk, "content") else str(chunk)
                     if token:
                         yield {"type": "token", "data": token}
