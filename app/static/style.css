@@ -493,13 +493,8 @@ html, body {
   display: flex;
   justify-content: flex-start;
   gap: .4rem;
-  padding: .2rem .3rem 0;
-  opacity: 0;
-  transition: opacity .2s ease;
+  padding: .25rem .3rem 0;
 }
-
-.message-assistant:hover .feedback-row,
-.feedback-row.has-rating { opacity: 1; }
 
 .feedback-btn {
   background: none;
@@ -507,15 +502,15 @@ html, body {
   cursor: pointer;
   padding: .2rem;
   border-radius: 4px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   transition: color var(--transition), background var(--transition);
   display: flex;
   align-items: center;
 }
 
-.feedback-btn:hover { color: var(--text-muted); background: var(--bg-input); }
-.feedback-btn.active-up { color: var(--success); opacity: 1; }
-.feedback-btn.active-down { color: var(--error); opacity: 1; }
+.feedback-btn:hover { color: var(--text); background: var(--bg-input); }
+.feedback-btn.active-up { color: var(--success); }
+.feedback-btn.active-down { color: var(--error); }
 .feedback-btn svg { width: 15px; height: 15px; }
 
 .feedback-comment {
