@@ -71,20 +71,13 @@ def get_messages(conversation_id):
         .order_by(Message.created_at)
         .all()
     )
-    result = []
-    for m in msgs:
-        fb = None
-        try:
-            if m.feedback:
-                fb = {"rating": m.feedback.rating, "comment": m.feedback.comment}
-        except Exception:
-            pass
-        result.append({
+    return jsonify([
+        {
             "id": m.id,
             "role": m.role,
             "content": m.content,
             "sources": json.loads(m.sources) if m.sources else None,
             "created_at": m.created_at.isoformat(),
-            "feedback": fb,
-        })
-    return jsonify(result)
+        }
+        for m in msgs
+    ])

@@ -18,11 +18,6 @@ const CSRF_TOKEN    = document.querySelector('meta[name="csrf-token"]').content;
 
 let currentConversationId = null;
 
-// Feedback SVG icons (subtle, 15px via CSS)
-const ICON_THUMB_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>';
-const ICON_THUMB_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg>';
-const ICON_RETRY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
-
 // ------------------------------------------------------------------
 // Sidebar toggle (mobile)
 // ------------------------------------------------------------------
@@ -171,7 +166,7 @@ async function openConversation(id) {
       return;
     }
     hideWelcome();
-    msgs.forEach(m => appendMessage(m.role, m.content, m.sources, m.id, m.feedback));
+    msgs.forEach(m => appendMessage(m.role, m.content, m.sources));
   } catch (err) {
     console.error('Failed to load messages:', err);
   }
@@ -220,7 +215,7 @@ function hideWelcome() {
 
 let _currentExchange = null;
 
-function appendMessage(role, content, sources, messageId, feedback) {
+function appendMessage(role, content, sources) {
   const wrapper = document.createElement('div');
   wrapper.className = `message message-${role}`;
 
@@ -232,19 +227,11 @@ function appendMessage(role, content, sources, messageId, feedback) {
     bubble.textContent = content;
   }
 
-  wrapper.appendChild(bubble);
-
   if (sources && sources.length > 0) {
+    wrapper.appendChild(bubble);
     wrapper.appendChild(buildSources(sources));
-  }
-
-  // Feedback row for assistant messages with a known ID
-  if (role === 'assistant' && messageId) {
-    try {
-      wrapper.appendChild(buildFeedbackRow(messageId, feedback));
-    } catch (err) {
-      console.error('Failed to build feedback row:', err);
-    }
+  } else {
+    wrapper.appendChild(bubble);
   }
 
   if (role === 'user') {
@@ -350,7 +337,6 @@ chatForm.addEventListener('submit', async (e) => {
   let sources = null;
   let assistantWrapper = null;
   let bubble = null;
-  let currentMessageId = null;
 
   try {
     const resp = await fetch('/ask', {
@@ -392,18 +378,7 @@ chatForm.addEventListener('submit', async (e) => {
           continue;
         }
 
-        if (event.type === 'message_id') {
-          currentMessageId = event.data;
-          // message_id arrives after done, so add feedback row now
-          if (assistantWrapper) {
-            try {
-              assistantWrapper.appendChild(buildFeedbackRow(currentMessageId, null));
-              scrollToBottom();
-            } catch (err) {
-              console.error('Failed to build feedback row:', err);
-            }
-          }
-        } else if (event.type === 'sources') {
+        if (event.type === 'sources') {
           sources = event.data;
         } else if (event.type === 'token') {
           if (!assistantWrapper) {
@@ -482,175 +457,6 @@ questionInput.addEventListener('keydown', (e) => {
     chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
   }
 });
-
-// ------------------------------------------------------------------
-// Feedback
-// ------------------------------------------------------------------
-
-function buildFeedbackRow(messageId, existingFeedback) {
-  const row = document.createElement('div');
-  row.className = 'feedback-row' + (existingFeedback ? ' has-rating' : '');
-  row.dataset.messageId = messageId;
-
-  const upBtn = document.createElement('button');
-  upBtn.type = 'button';
-  upBtn.className = 'feedback-btn' + (existingFeedback?.rating === 'up' ? ' active-up' : '');
-  upBtn.innerHTML = ICON_THUMB_UP;
-  upBtn.title = 'Gut';
-
-  const downBtn = document.createElement('button');
-  downBtn.type = 'button';
-  downBtn.className = 'feedback-btn' + (existingFeedback?.rating === 'down' ? ' active-down' : '');
-  downBtn.innerHTML = ICON_THUMB_DOWN;
-  downBtn.title = 'Schlecht';
-
-  const retryBtn = document.createElement('button');
-  retryBtn.type = 'button';
-  retryBtn.className = 'feedback-btn';
-  retryBtn.innerHTML = ICON_RETRY;
-  retryBtn.title = 'Nochmal versuchen';
-
-  upBtn.addEventListener('click', () => submitFeedback(row, messageId, 'up'));
-  downBtn.addEventListener('click', () => submitFeedback(row, messageId, 'down'));
-  retryBtn.addEventListener('click', () => retryMessage(messageId, row));
-
-  row.appendChild(upBtn);
-  row.appendChild(downBtn);
-  row.appendChild(retryBtn);
-  return row;
-}
-
-async function submitFeedback(row, messageId, rating) {
-  if (rating === 'down') {
-    // Show comment form if not already visible
-    let commentForm = row.parentElement.querySelector('.feedback-comment');
-    if (!commentForm) {
-      commentForm = document.createElement('div');
-      commentForm.className = 'feedback-comment';
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.placeholder = 'Was war schlecht?';
-      input.maxLength = 500;
-      const sendLink = document.createElement('button');
-      sendLink.type = 'button';
-      sendLink.className = 'feedback-comment-send';
-      sendLink.textContent = 'Senden';
-      sendLink.addEventListener('click', async () => {
-        await doSubmitFeedback(row, messageId, 'down', input.value.trim());
-        commentForm.remove();
-      });
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); sendLink.click(); }
-      });
-      commentForm.appendChild(input);
-      commentForm.appendChild(sendLink);
-      row.after(commentForm);
-      input.focus();
-      return;
-    }
-  }
-  await doSubmitFeedback(row, messageId, rating, '');
-}
-
-async function doSubmitFeedback(row, messageId, rating, comment) {
-  try {
-    await apiPost('/feedback', { message_id: messageId, rating, comment });
-    const btns = row.querySelectorAll('.feedback-btn');
-    btns[0].className = 'feedback-btn' + (rating === 'up' ? ' active-up' : '');
-    btns[1].className = 'feedback-btn' + (rating === 'down' ? ' active-down' : '');
-    row.classList.add('has-rating');
-  } catch (err) {
-    console.error('Feedback failed:', err);
-  }
-}
-
-async function retryMessage(messageId, feedbackRow) {
-  const wrapper = feedbackRow.closest('.message-assistant');
-  if (!wrapper) return;
-
-  // Remove feedback row and comment form
-  const commentForm = wrapper.querySelector('.feedback-comment');
-  if (commentForm) commentForm.remove();
-  feedbackRow.remove();
-
-  // Replace content with loading indicator
-  const bubble = wrapper.querySelector('.message-bubble');
-  const oldSources = wrapper.querySelector('.sources');
-  if (oldSources) oldSources.remove();
-  bubble.innerHTML = '<div class="spinner"></div> Generiere neue Antwort …';
-  bubble.style.display = 'flex';
-  bubble.style.alignItems = 'center';
-  bubble.style.gap = '.65rem';
-  bubble.style.color = 'var(--text-muted)';
-  bubble.style.fontSize = '.875rem';
-
-  let rawText = '';
-  let newSources = null;
-  let newMessageId = null;
-
-  try {
-    const resp = await fetch('/retry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-      body: JSON.stringify({ message_id: messageId }),
-    });
-
-    if (!resp.ok) {
-      bubble.textContent = 'Fehler beim erneuten Generieren.';
-      bubble.style = '';
-      return;
-    }
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let firstToken = true;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        let event;
-        try { event = JSON.parse(line.slice(6)); } catch { continue; }
-
-        if (event.type === 'token') {
-          if (firstToken) {
-            bubble.removeAttribute('style');
-            bubble.textContent = '';
-            firstToken = false;
-          }
-          rawText += event.data;
-          bubble.textContent = rawText;
-          scrollToBottom();
-        } else if (event.type === 'sources') {
-          newSources = event.data;
-        } else if (event.type === 'message_id') {
-          newMessageId = event.data;
-        } else if (event.type === 'done') {
-          if (typeof marked !== 'undefined') {
-            bubble.innerHTML = DOMPurify.sanitize(marked.parse(rawText));
-          }
-          if (newSources && newSources.length > 0) {
-            wrapper.appendChild(buildSources(newSources));
-          }
-          if (newMessageId) {
-            wrapper.appendChild(buildFeedbackRow(newMessageId, null));
-          }
-          scrollToBottom();
-        }
-      }
-    }
-  } catch (err) {
-    bubble.textContent = 'Verbindungsfehler beim Retry.';
-    bubble.removeAttribute('style');
-  }
-}
 
 // ------------------------------------------------------------------
 // Init

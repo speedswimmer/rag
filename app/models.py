@@ -57,21 +57,3 @@ class Message(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     conversation = db.relationship("Conversation", back_populates="messages")
-    feedback = db.relationship(
-        "Feedback", back_populates="message", uselist=False, cascade="all, delete-orphan"
-    )
-
-
-class Feedback(db.Model):
-    __tablename__ = "feedback"
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    message_id = db.Column(
-        db.Integer, db.ForeignKey("messages.id", ondelete="CASCADE"),
-        nullable=False, unique=True, index=True
-    )
-    rating = db.Column(db.String(4), nullable=False)  # 'up' or 'down'
-    comment = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
-
-    message = db.relationship("Message", back_populates="feedback")
