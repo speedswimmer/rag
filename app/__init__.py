@@ -157,4 +157,64 @@ def create_app(config: Config | None = None) -> Flask:
     def forbidden(e):
         return render_template("403.html"), 403
 
+    import click
+
+    @app.cli.command("create-user")
+    @click.argument("username")
+    @click.option("--role", type=click.Choice(["leser", "user", "admin"]), required=True)
+    def create_user_cmd(username, role):
+        """Create a new user with the given role."""
+        from app.models import User
+        if User.query.filter_by(username=username).first():
+            click.echo(f"Fehler: Benutzer '{username}' existiert bereits.")
+            raise SystemExit(1)
+        password = click.prompt("Passwort", hide_input=True, confirmation_prompt=True)
+        user = User(username=username, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        click.echo(f"Benutzer '{username}' (Rolle: {role}) angelegt.")
+
+    @app.cli.command("change-password")
+    @click.argument("username")
+    def change_password_cmd(username):
+        """Change the password for an existing user."""
+        from app.models import User
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            click.echo(f"Fehler: Benutzer '{username}' nicht gefunden.")
+            raise SystemExit(1)
+        password = click.prompt("Neues Passwort", hide_input=True, confirmation_prompt=True)
+        user.set_password(password)
+        db.session.commit()
+        click.echo(f"Passwort fuer '{username}' geaendert.")
+
+    @app.cli.command("list-users")
+    def list_users_cmd():
+        """List all users."""
+        from app.models import User
+        users = User.query.order_by(User.created_at).all()
+        if not users:
+            click.echo("Keine Benutzer vorhanden.")
+            return
+        click.echo(f"{'Username':<20} {'Rolle':<10} {'Aktiv':<8} {'Erstellt'}")
+        click.echo("-" * 60)
+        for u in users:
+            created = u.created_at.strftime("%d.%m.%Y %H:%M")
+            active = "Ja" if u.is_active else "Nein"
+            click.echo(f"{u.username:<20} {u.role:<10} {active:<8} {created}")
+
+    @app.cli.command("disable-user")
+    @click.argument("username")
+    def disable_user_cmd(username):
+        """Disable a user (prevent login)."""
+        from app.models import User
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            click.echo(f"Fehler: Benutzer '{username}' nicht gefunden.")
+            raise SystemExit(1)
+        user.is_active = False
+        db.session.commit()
+        click.echo(f"Benutzer '{username}' deaktiviert.")
+
     return app
