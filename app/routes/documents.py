@@ -135,7 +135,7 @@ def upload():
         file_hash = _compute_hash(file)
         duplicate_name = _find_duplicate(cfg.docs_dir, file_hash, cfg.allowed_extensions)
         if duplicate_name:
-            errors.append(f"{file.filename}: Identisch mit bereits vorhandener Datei „{duplicate_name}"")
+            errors.append(f"{file.filename}: Identisch mit bereits vorhandener Datei \"{duplicate_name}\"")
             continue
 
         filename = secure_filename(file.filename)
