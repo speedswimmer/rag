@@ -1080,3 +1080,117 @@ th.doc-actions { border-bottom: none; }
   /* Upload button full width on mobile */
   .upload-actions { flex-direction: column; align-items: flex-start; }
 }
+
+/* ============================================================
+   Login page
+   ============================================================ */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 54px);
+  padding: 2rem;
+}
+
+.login-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: .25rem;
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  font-size: .9rem;
+}
+
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--error-bg);
+  border: 1px solid rgba(248,113,113,.25);
+  border-radius: var(--radius);
+  padding: .7rem 1rem;
+  margin-bottom: 1.25rem;
+  color: var(--error);
+  font-size: .85rem;
+}
+
+.login-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .4rem;
+}
+
+.login-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  color: var(--text);
+  font-size: .95rem;
+  font-family: inherit;
+  margin-bottom: 1.1rem;
+  transition: border-color var(--transition);
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.login-button {
+  width: 100%;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  padding: .8rem;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition);
+  margin-top: .5rem;
+}
+
+.login-button:hover {
+  background: var(--accent-hover);
+}
+
+.login-guest {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+
+.login-guest a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.login-guest a:hover {
+  text-decoration: underline;
+}
