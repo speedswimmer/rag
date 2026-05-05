@@ -5,9 +5,15 @@ import os
 import uuid
 
 from flask import Flask, g, request as flask_request
+from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
 _csrf = CSRFProtect()
+
+_login_manager = LoginManager()
+_login_manager.login_view = "auth.login"
+_login_manager.login_message = "Bitte anmelden, um auf diesen Bereich zuzugreifen."
+_login_manager.login_message_category = "info"
 
 from app.config import Config
 from app.database import db
@@ -43,8 +49,18 @@ def create_app(config: Config | None = None) -> Flask:
     app.config["SECRET_KEY"] = cfg.secret_key
     app.config["MAX_CONTENT_LENGTH"] = cfg.max_content_length
     app.config["WTF_CSRF_TIME_LIMIT"] = None  # Token läuft nicht ab (kein Login)
+    from datetime import timedelta
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=30)
+    app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+    app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
 
     _csrf.init_app(app)
+    _login_manager.init_app(app)
+
+    @_login_manager.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return db.session.get(User, int(user_id))
 
     # Database
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{cfg.chat_db_path}"
@@ -54,6 +70,10 @@ def create_app(config: Config | None = None) -> Flask:
     with app.app_context():
         from app import models  # noqa: F401 — registers models with SQLAlchemy
         db.create_all()
+
+        from app.models import User
+        if not User.query.filter_by(role="admin").first():
+            logger.warning("Kein Admin-Benutzer vorhanden — bitte mit 'flask create-user' anlegen")
 
     if not os.getenv("ANTHROPIC_API_KEY"):
         logger.error("ANTHROPIC_API_KEY is not set — LLM calls will fail")
@@ -122,11 +142,12 @@ def create_app(config: Config | None = None) -> Flask:
     def timestamp_to_str(ts: float) -> str:
         return datetime.datetime.fromtimestamp(ts).strftime("%d.%m.%Y %H:%M")
 
-    # Inject app_name into every template context
+    # Inject app_name and current_user into every template context
     from app.settings import get_app_name
+    from flask_login import current_user as _current_user
 
     @app.context_processor
-    def inject_app_name():
-        return {"app_name": get_app_name()}
+    def inject_globals():
+        return {"app_name": get_app_name(), "current_user": _current_user}
 
     return app
