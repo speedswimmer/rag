@@ -105,6 +105,9 @@ def create_app(config: Config | None = None) -> Flask:
     from app.routes.conversations import conversations_bp
     app.register_blueprint(conversations_bp)
 
+    from app.routes.auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     # Anonymous session cookie
     @app.before_request
     def ensure_session_cookie():
