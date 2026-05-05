@@ -13,14 +13,47 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import Chroma
 from langchain_classic.chains import RetrievalQA
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain.retrievers import EnsembleRetriever
+from langchain_core.retrievers import BaseRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 if TYPE_CHECKING:
     from app.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+class EnsembleRetriever(BaseRetriever):
+    """Combine multiple retrievers via Reciprocal Rank Fusion (RRF)."""
+
+    retrievers: list[BaseRetriever]
+    weights: list[float]
+    c: int = 60  # RRF constant
+
+    def _get_relevant_documents(
+        self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+    ) -> list[Document]:
+        # Collect results from all retrievers
+        all_docs: list[list[Document]] = []
+        for retriever in self.retrievers:
+            all_docs.append(retriever.invoke(query))
+
+        # RRF scoring
+        scores: dict[str, float] = {}
+        doc_map: dict[str, Document] = {}
+        for docs, weight in zip(all_docs, self.weights):
+            for rank, doc in enumerate(docs):
+                key = doc.page_content
+                if key not in doc_map:
+                    doc_map[key] = doc
+                    scores[key] = 0.0
+                scores[key] += weight / (self.c + rank + 1)
+
+        # Sort by score descending
+        sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
+        return [doc_map[k] for k in sorted_keys]
 
 
 def is_scanned_pdf(path: Path) -> bool:
@@ -445,7 +478,6 @@ class RAGEngine:
             result = collection.get(include=["documents", "metadatas"])
             if not result["documents"]:
                 return
-            from langchain_core.documents import Document
             chunks = [
                 Document(page_content=doc, metadata=meta or {})
                 for doc, meta in zip(result["documents"], result["metadatas"])
