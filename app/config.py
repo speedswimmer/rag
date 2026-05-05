@@ -50,7 +50,7 @@ class Config:
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
     )
     llm_model: str = field(
-        default_factory=lambda: os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
+        default_factory=lambda: os.getenv("LLM_MODEL", "claude-sonnet-4-6")
     )
 
     # Flask
