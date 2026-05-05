@@ -342,12 +342,15 @@ function buildFeedbackRow(messageId, existingRating) {
 }
 
 async function submitFeedback(messageId, rating, row, selectedBtn) {
+  if (row.classList.contains('rated')) return;
+  row.classList.add('rated');
+  selectedBtn.classList.add('selected');
   try {
     await apiPost('/messages/' + messageId + '/feedback', { rating });
-    row.classList.add('rated');
-    selectedBtn.classList.add('selected');
   } catch (err) {
     console.error('Feedback failed:', err);
+    row.classList.remove('rated');
+    selectedBtn.classList.remove('selected');
   }
 }
 
