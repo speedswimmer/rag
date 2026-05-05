@@ -223,7 +223,7 @@ function appendMessage(role, content, sources, messageId, feedback) {
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
-  if (role === 'assistant' && typeof marked !== 'undefined') {
+  if (role === 'assistant' && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
     bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
   } else {
     bubble.textContent = content;
@@ -479,7 +479,7 @@ chatForm.addEventListener('submit', async (e) => {
           bubble.textContent = rawText;
           scrollToBottom();
         } else if (event.type === 'done') {
-          if (bubble && typeof marked !== 'undefined') {
+          if (bubble && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
             bubble.innerHTML = DOMPurify.sanitize(marked.parse(rawText));
           }
           if (sources && sources.length > 0 && assistantWrapper) {
