@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Anmelden — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <h1 class="login-title">{{ app_name }}</h1>
+      <p class="login-subtitle">Anmeldung</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="login-error">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.login_post', next=request.args.get('next', '')) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="login-label" for="username">Benutzername</label>
+      <input class="login-input" type="text" id="username" name="username"
+             required autocomplete="username" autofocus>
+
+      <label class="login-label" for="password">Passwort</label>
+      <input class="login-input" type="password" id="password" name="password"
+             required autocomplete="current-password">
+
+      <button class="login-button" type="submit">Anmelden</button>
+    </form>
+
+    <div class="login-guest">
+      Kein Konto? <a href="{{ url_for('chat.index') }}">Als Gast zum Chat &rarr;</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
