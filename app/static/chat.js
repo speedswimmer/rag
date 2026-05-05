@@ -224,8 +224,7 @@ function appendMessage(role, content, sources, messageId, feedback) {
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
   if (role === 'assistant' && typeof marked !== 'undefined') {
-    bubble.textContent = content; // replaced by sanitized HTML below
-    bubble.setAttribute('data-md', content);
+    bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
   } else {
     bubble.textContent = content;
   }
@@ -249,23 +248,6 @@ function appendMessage(role, content, sources, messageId, feedback) {
     _currentExchange.appendChild(wrapper);
   } else {
     chatMessages.appendChild(wrapper);
-  }
-
-  // Render markdown safely after DOM insertion
-  if (role === 'assistant' && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-    const md = bubble.getAttribute('data-md');
-    if (md !== null) {
-      const clean = DOMPurify.sanitize(marked.parse(md));
-      bubble.removeAttribute('data-md');
-      bubble.textContent = '';
-      const tmp = document.createElement('div');
-      tmp.textContent = clean;
-      // Use insertAdjacentHTML equivalent via parser
-      const range = document.createRange();
-      range.selectNodeContents(bubble);
-      range.deleteContents();
-      bubble.appendChild(range.createContextualFragment(DOMPurify.sanitize(marked.parse(md))));
-    }
   }
 
   scrollToBottom();
