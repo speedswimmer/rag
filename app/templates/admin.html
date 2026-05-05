@@ -158,6 +158,54 @@
     </div>
   </section>
 
+  <!-- Feedback stats -->
+  <section class="info-section" style="margin-bottom:1.5rem">
+    <h2 class="section-title">Antwort-Feedback</h2>
+    <table class="info-table" style="margin-bottom:1rem">
+      <tbody>
+        <tr>
+          <td class="info-key">Gesamt</td>
+          <td class="info-val">{{ feedback_stats.total }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Positiv</td>
+          <td class="info-val" style="color:var(--success)">{{ feedback_stats.total_up }}</td>
+        </tr>
+        <tr>
+          <td class="info-key">Negativ</td>
+          <td class="info-val" style="color:var(--error)">{{ feedback_stats.total_down }}</td>
+        </tr>
+      </tbody>
+    </table>
+    {% if feedback_stats.negatives %}
+    <h3 style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.6rem">
+      Negative Bewertungen (letzte 20)
+    </h3>
+    <div class="docs-table-wrapper" style="max-height:320px">
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>Frage</th>
+            <th>Antwort (Auszug)</th>
+            <th>Datum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in feedback_stats.negatives %}
+          <tr>
+            <td style="font-weight:500;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.question }}</td>
+            <td style="color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.answer }}</td>
+            <td style="white-space:nowrap;color:var(--text-muted);font-size:.82rem">{{ item.date }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-hint">Noch keine negativen Bewertungen vorhanden.</p>
+    {% endif %}
+  </section>
+
   <!-- System info -->
   <section class="info-section">
     <h2 class="section-title">System</h2>
