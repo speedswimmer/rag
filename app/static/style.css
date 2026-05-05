@@ -85,6 +85,14 @@ html, body {
   box-shadow: 0 2px 10px rgba(99,102,241,.35);
 }
 
+.nav-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: auto;
+  gap: .1rem;
+}
+
 .nav-links { display: flex; gap: .2rem; }
 
 /* Background index status indicator */
@@ -1200,9 +1208,7 @@ th.doc-actions { border-bottom: none; }
   display: flex;
   align-items: center;
   gap: .4rem;
-  margin-left: auto;
-  padding-left: 1rem;
-  font-size: .85rem;
+  font-size: .75rem;
 }
 
 .nav-username {
