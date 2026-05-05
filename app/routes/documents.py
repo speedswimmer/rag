@@ -1,5 +1,6 @@
 """Document routes — list documents and handle uploads."""
 
+import hashlib
 import json
 import logging
 import threading
@@ -122,6 +123,21 @@ def upload():
             errors.append(f"{file.filename}: Dateiinhalt entspricht nicht dem erwarteten Format")
             continue
 
+        # Empty file check
+        file.seek(0, 2)  # seek to end
+        size = file.tell()
+        file.seek(0)
+        if size == 0:
+            errors.append(f"{file.filename}: Datei ist leer")
+            continue
+
+        # Duplicate detection via SHA-256
+        file_hash = _compute_hash(file)
+        duplicate_name = _find_duplicate(cfg.docs_dir, file_hash, cfg.allowed_extensions)
+        if duplicate_name:
+            errors.append(f"{file.filename}: Identisch mit bereits vorhandener Datei „{duplicate_name}"")
+            continue
+
         filename = secure_filename(file.filename)
         dest = cfg.docs_dir / filename
         file.save(str(dest))
@@ -160,6 +176,30 @@ def upload():
 
 def _sse(event: str, message: str) -> str:
     return f"data: {json.dumps({'event': event, 'message': message})}\n\n"
+
+
+def _compute_hash(file) -> str:
+    """Compute SHA-256 hash of an uploaded file."""
+    h = hashlib.sha256()
+    while chunk := file.read(8192):
+        h.update(chunk)
+    file.seek(0)
+    return h.hexdigest()
+
+
+def _find_duplicate(docs_dir: Path, file_hash: str, allowed_extensions: frozenset) -> str | None:
+    """Check if a file with the same hash already exists in docs_dir."""
+    exts = {"." + ext for ext in allowed_extensions}
+    for p in docs_dir.glob("**/*"):
+        if not p.is_file() or p.suffix.lower() not in exts:
+            continue
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            while chunk := f.read(8192):
+                h.update(chunk)
+        if h.hexdigest() == file_hash:
+            return p.name
+    return None
 
 
 def _validate_file_content(file, ext: str) -> bool:
