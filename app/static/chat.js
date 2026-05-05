@@ -167,7 +167,7 @@ async function openConversation(id) {
       return;
     }
     hideWelcome();
-    msgs.forEach(m => appendMessage(m.role, m.content, m.sources));
+    msgs.forEach(m => appendMessage(m.role, m.content, m.sources, m.id, m.feedback));
   } catch (err) {
     console.error('Failed to load messages:', err);
   }
@@ -217,23 +217,27 @@ function hideWelcome() {
 
 let _currentExchange = null;
 
-function appendMessage(role, content, sources) {
+function appendMessage(role, content, sources, messageId, feedback) {
   const wrapper = document.createElement('div');
   wrapper.className = `message message-${role}`;
 
   const bubble = document.createElement('div');
   bubble.className = 'message-bubble';
   if (role === 'assistant' && typeof marked !== 'undefined') {
-    bubble.innerHTML = DOMPurify.sanitize(marked.parse(content));
+    bubble.textContent = content; // replaced by sanitized HTML below
+    bubble.setAttribute('data-md', content);
   } else {
     bubble.textContent = content;
   }
 
+  wrapper.appendChild(bubble);
+
   if (sources && sources.length > 0) {
-    wrapper.appendChild(bubble);
     wrapper.appendChild(buildSources(sources));
-  } else {
-    wrapper.appendChild(bubble);
+  }
+
+  if (role === 'assistant') {
+    wrapper.appendChild(buildFeedbackRow(messageId, feedback));
   }
 
   if (role === 'user') {
@@ -245,6 +249,23 @@ function appendMessage(role, content, sources) {
     _currentExchange.appendChild(wrapper);
   } else {
     chatMessages.appendChild(wrapper);
+  }
+
+  // Render markdown safely after DOM insertion
+  if (role === 'assistant' && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+    const md = bubble.getAttribute('data-md');
+    if (md !== null) {
+      const clean = DOMPurify.sanitize(marked.parse(md));
+      bubble.removeAttribute('data-md');
+      bubble.textContent = '';
+      const tmp = document.createElement('div');
+      tmp.textContent = clean;
+      // Use insertAdjacentHTML equivalent via parser
+      const range = document.createRange();
+      range.selectNodeContents(bubble);
+      range.deleteContents();
+      bubble.appendChild(range.createContextualFragment(DOMPurify.sanitize(marked.parse(md))));
+    }
   }
 
   scrollToBottom();
@@ -278,6 +299,74 @@ function buildSources(sources) {
   container.appendChild(toggle);
   container.appendChild(list);
   return container;
+}
+
+// ------------------------------------------------------------------
+// Feedback buttons
+// ------------------------------------------------------------------
+
+function createThumbUpSVG() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M7 22V11l5-9 1.5.5c.8.3 1.5 1.2 1.5 2.1V8h5.5c1.4 0 2.4 1.3 2 2.6l-2.3 8A2 2 0 0 1 18.3 20H7z');
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', '1'); rect.setAttribute('y', '11');
+  rect.setAttribute('width', '5'); rect.setAttribute('height', '11');
+  rect.setAttribute('rx', '1');
+  svg.appendChild(path);
+  svg.appendChild(rect);
+  return svg;
+}
+
+function createThumbDownSVG() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M17 2v11l-5 9-1.5-.5c-.8-.3-1.5-1.2-1.5-2.1V16H3.5c-1.4 0-2.4-1.3-2-2.6l2.3-8A2 2 0 0 1 5.7 4H17z');
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', '18'); rect.setAttribute('y', '2');
+  rect.setAttribute('width', '5'); rect.setAttribute('height', '11');
+  rect.setAttribute('rx', '1');
+  svg.appendChild(path);
+  svg.appendChild(rect);
+  return svg;
+}
+
+function buildFeedbackRow(messageId, existingRating) {
+  const row = document.createElement('div');
+  row.className = 'feedback-row' + (existingRating ? ' rated' : '');
+
+  const upBtn = document.createElement('button');
+  upBtn.className = 'feedback-btn' + (existingRating === 'up' ? ' selected' : '');
+  upBtn.type = 'button';
+  upBtn.title = 'Gute Antwort';
+  upBtn.appendChild(createThumbUpSVG());
+
+  const downBtn = document.createElement('button');
+  downBtn.className = 'feedback-btn' + (existingRating === 'down' ? ' selected' : '');
+  downBtn.type = 'button';
+  downBtn.title = 'Schlechte Antwort';
+  downBtn.appendChild(createThumbDownSVG());
+
+  if (!existingRating && messageId) {
+    upBtn.addEventListener('click', () => submitFeedback(messageId, 'up', row, upBtn));
+    downBtn.addEventListener('click', () => submitFeedback(messageId, 'down', row, downBtn));
+  }
+
+  row.appendChild(upBtn);
+  row.appendChild(downBtn);
+  return row;
+}
+
+async function submitFeedback(messageId, rating, row, selectedBtn) {
+  try {
+    await apiPost('/messages/' + messageId + '/feedback', { rating });
+    row.classList.add('rated');
+    selectedBtn.classList.add('selected');
+  } catch (err) {
+    console.error('Feedback failed:', err);
+  }
 }
 
 function addLoadingIndicator() {
@@ -325,13 +414,13 @@ chatForm.addEventListener('submit', async (e) => {
       currentConversationId = data.id;
       loadConversations();
     } catch (err) {
-      appendMessage('assistant', 'Fehler beim Erstellen der Unterhaltung: ' + err.message, null);
+      appendMessage('assistant', 'Fehler beim Erstellen der Unterhaltung: ' + err.message, null, null, null);
       setLoading(false);
       return;
     }
   }
 
-  appendMessage('user', question, null);
+  appendMessage('user', question, null, null, null);
 
   const loadingEl = addLoadingIndicator();
 
@@ -353,7 +442,7 @@ chatForm.addEventListener('submit', async (e) => {
     if (!resp.ok) {
       loadingEl.remove();
       const errData = await resp.json().catch(() => null);
-      appendMessage('assistant', `Fehler: ${errData?.error || resp.statusText}`, null);
+      appendMessage('assistant', `Fehler: ${errData?.error || resp.statusText}`, null, null, null);
       setLoading(false);
       questionInput.focus();
       return;
@@ -382,6 +471,11 @@ chatForm.addEventListener('submit', async (e) => {
 
         if (event.type === 'sources') {
           sources = event.data;
+        } else if (event.type === 'message_id') {
+          if (assistantWrapper && event.data) {
+            assistantWrapper.appendChild(buildFeedbackRow(event.data, null));
+            scrollToBottom();
+          }
         } else if (event.type === 'token') {
           if (!assistantWrapper) {
             loadingEl.remove();
@@ -411,14 +505,14 @@ chatForm.addEventListener('submit', async (e) => {
           loadConversations();
         } else if (event.type === 'error') {
           loadingEl.remove();
-          appendMessage('assistant', `Fehler: ${event.data}`, null);
+          appendMessage('assistant', `Fehler: ${event.data}`, null, null, null);
         }
       }
     }
   } catch (err) {
     loadingEl.remove();
     if (!assistantWrapper) {
-      appendMessage('assistant', `Verbindungsfehler: ${err.message}`, null);
+      appendMessage('assistant', `Verbindungsfehler: ${err.message}`, null, null, null);
     }
   }
 
