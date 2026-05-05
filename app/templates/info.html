@@ -27,6 +27,10 @@
           <td class="info-val">{{ cfg.retrieval_k }}</td>
         </tr>
         <tr>
+          <td class="info-key">Suchverfahren</td>
+          <td class="info-val">Hybrid (Vektor {{ ((1 - cfg.bm25_weight) * 100) | int }}% / BM25 {{ (cfg.bm25_weight * 100) | int }}%)</td>
+        </tr>
+        <tr>
           <td class="info-key">Chunk-Größe</td>
           <td class="info-val">{{ cfg.chunk_size }} Zeichen</td>
         </tr>
@@ -79,7 +83,14 @@
         <span class="feature-icon">&#10003;</span>
         <div>
           <strong>Erweiterter Kontext</strong>
-          Pro Anfrage werden {{ cfg.retrieval_k }} relevante Textpassagen abgerufen (vorher: 3) für vollständigere Antworten
+          Pro Anfrage werden {{ cfg.retrieval_k }} relevante Textpassagen abgerufen für vollständigere Antworten
+        </div>
+      </li>
+      <li>
+        <span class="feature-icon">&#10003;</span>
+        <div>
+          <strong>Hybrid Search</strong>
+          Kombiniert semantische Suche (Vektor) mit Keyword-Suche (BM25) — findet auch Fachbegriffe, Eigennamen und exakte Formulierungen zuverlässig
         </div>
       </li>
       <li>

@@ -70,6 +70,9 @@ class Config:
     retrieval_k: int = 10
     llm_max_tokens: int = 2048
     llm_temperature: float = 0.3
+    bm25_weight: float = field(
+        default_factory=lambda: float(os.getenv("BM25_WEIGHT", "0.5"))
+    )
 
     def __post_init__(self):
         if self.docs_dir is None:

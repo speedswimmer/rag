@@ -10,9 +10,11 @@ from typing import TYPE_CHECKING, Callable
 from langchain_anthropic import ChatAnthropic
 from langchain_community.document_loaders import DirectoryLoader, Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import Chroma
 from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
+from langchain.retrievers import EnsembleRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 if TYPE_CHECKING:
@@ -83,6 +85,8 @@ class RAGEngine:
         self.config = config
         self._embeddings: HuggingFaceEmbeddings | None = None
         self._vectorstore: Chroma | None = None
+        self._bm25_retriever: BM25Retriever | None = None
+        self._ensemble_retriever: EnsembleRetriever | None = None
         self._qa_chain: RetrievalQA | None = None
 
     # ------------------------------------------------------------------
@@ -108,6 +112,7 @@ class RAGEngine:
                 persist_directory=str(chroma_dir),
                 embedding_function=self._embeddings,
             )
+            self._build_bm25_from_vectorstore()
             self._build_chain()
         else:
             logger.info("No existing ChromaDB found — index will be built on first request")
@@ -134,6 +139,7 @@ class RAGEngine:
             persist_directory=str(self.config.chroma_dir),
         )
         logger.info("ChromaDB rebuilt with %d chunks", len(chunks))
+        self._build_bm25(chunks)
         self._build_chain()
 
     def chunk_count(self) -> int | None:
@@ -257,9 +263,12 @@ class RAGEngine:
         if history:
             search_question = self._condense_question(question, history)
 
-        # 2. Retrieve relevant chunks using the condensed question
+        # 2. Retrieve relevant chunks using the condensed question (hybrid search)
         try:
-            docs = self._vectorstore.similarity_search(search_question, k=self.config.retrieval_k)
+            retriever = self._ensemble_retriever or self._vectorstore.as_retriever(
+                search_kwargs={"k": self.config.retrieval_k}
+            )
+            docs = retriever.invoke(search_question)
         except Exception:
             logger.exception("Retrieval failed")
             yield {"type": "error", "data": "Fehler bei der Dokumentensuche."}
@@ -324,6 +333,7 @@ class RAGEngine:
                     persist_directory=str(chroma_dir),
                     embedding_function=self._embeddings,
                 )
+                self._build_bm25_from_vectorstore()
                 self._build_chain()
                 logger.info("Lazy-loaded ChromaDB index")
         except Exception as exc:
@@ -415,18 +425,67 @@ class RAGEngine:
         )
         return splitter.split_documents(docs)
 
+    def _build_bm25(self, chunks: list) -> None:
+        """Build BM25 retriever from document chunks."""
+        if not chunks:
+            self._bm25_retriever = None
+            self._ensemble_retriever = None
+            return
+        self._bm25_retriever = BM25Retriever.from_documents(
+            chunks, k=self.config.retrieval_k
+        )
+        logger.info("BM25 retriever built with %d chunks", len(chunks))
+
+    def _build_bm25_from_vectorstore(self) -> None:
+        """Reconstruct BM25 retriever from existing ChromaDB data."""
+        if self._vectorstore is None:
+            return
+        try:
+            collection = self._vectorstore._collection
+            result = collection.get(include=["documents", "metadatas"])
+            if not result["documents"]:
+                return
+            from langchain_core.documents import Document
+            chunks = [
+                Document(page_content=doc, metadata=meta or {})
+                for doc, meta in zip(result["documents"], result["metadatas"])
+            ]
+            self._build_bm25(chunks)
+        except Exception as exc:
+            logger.warning("Could not build BM25 from existing index: %s", exc)
+
+    def _build_ensemble(self) -> None:
+        """Combine vector and BM25 retrievers into an ensemble."""
+        vector_retriever = self._vectorstore.as_retriever(
+            search_kwargs={"k": self.config.retrieval_k}
+        )
+        bm25_w = self.config.bm25_weight
+        vector_w = 1.0 - bm25_w
+        if self._bm25_retriever is not None:
+            self._ensemble_retriever = EnsembleRetriever(
+                retrievers=[vector_retriever, self._bm25_retriever],
+                weights=[vector_w, bm25_w],
+            )
+            logger.info("Ensemble retriever built (vector=%.0f%%, bm25=%.0f%%)",
+                        vector_w * 100, bm25_w * 100)
+        else:
+            self._ensemble_retriever = None
+            logger.info("No BM25 available — using vector-only retrieval")
+
     def _build_chain(self) -> None:
+        self._build_ensemble()
         llm = ChatAnthropic(
             model=self.config.llm_model,
             max_tokens=self.config.llm_max_tokens,
             temperature=self.config.llm_temperature,
         )
+        retriever = self._ensemble_retriever or self._vectorstore.as_retriever(
+            search_kwargs={"k": self.config.retrieval_k}
+        )
         self._qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-            retriever=self._vectorstore.as_retriever(
-                search_kwargs={"k": self.config.retrieval_k}
-            ),
+            retriever=retriever,
             return_source_documents=True,
             chain_type_kwargs={"prompt": _RAG_PROMPT},
         )

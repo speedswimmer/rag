@@ -12,6 +12,7 @@ langchain-text-splitters>=0.3
 langchain-classic>=0.1
 
 chromadb>=0.5
+rank-bm25>=0.2
 sentence-transformers>=3.0
 pypdf>=4.0
 docx2txt>=0.8
