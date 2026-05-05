@@ -7,7 +7,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, render_template,
 
 from app import get_rag_engine
 from app.database import db
-from app.models import Conversation, Message
+from app.models import Conversation, Feedback, Message
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ def ask():
     def generate():
         full_answer = ""
         sources_data = None
+        saved_message_id = None
 
         for event in get_rag_engine().ask_stream(question, history=history):
             if event["type"] == "token":
@@ -85,12 +86,16 @@ def ask():
                     fresh_conv.updated_at = datetime.now(timezone.utc)
 
                 db.session.commit()
+                saved_message_id = assistant_msg.id
                 logger.info("Saved assistant message (%d chars) to conversation %s", len(full_answer), conversation_id)
             except Exception:
                 logger.exception("Failed to save assistant message")
                 db.session.rollback()
         else:
             logger.warning("No answer generated — nothing to save")
+
+        # Send message ID so frontend can attach feedback
+        yield f"data: {json.dumps({'type': 'message_id', 'data': saved_message_id}, ensure_ascii=False)}\n\n"
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
@@ -110,3 +115,32 @@ def _load_history(conversation_id: str, limit: int) -> list[dict]:
     # Take last N*2 messages (N exchanges = N user + N assistant)
     recent = msgs[-(limit * 2):] if msgs else []
     return [{"role": m.role, "content": m.content} for m in recent]
+
+
+@chat_bp.post("/messages/<int:message_id>/feedback")
+def submit_feedback(message_id: int):
+    msg = db.session.get(Message, message_id)
+    if not msg:
+        return jsonify({"error": "Nachricht nicht gefunden"}), 404
+
+    # Verify message belongs to current session
+    conv = db.session.get(Conversation, msg.conversation_id)
+    if not conv or conv.session_id != g.session_id:
+        return jsonify({"error": "Nachricht nicht gefunden"}), 404
+
+    if msg.role != "assistant":
+        return jsonify({"error": "Feedback nur fuer Assistenten-Antworten moeglich"}), 400
+
+    data = request.get_json(silent=True) or {}
+    rating = data.get("rating")
+    if rating not in ("up", "down"):
+        return jsonify({"error": "Ungueltiges Rating (up/down erwartet)"}), 400
+
+    if msg.feedback:
+        return jsonify({"error": "Bereits bewertet"}), 409
+
+    feedback = Feedback(message_id=message_id, rating=rating)
+    db.session.add(feedback)
+    db.session.commit()
+
+    return jsonify({"ok": True})
