@@ -8,9 +8,11 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
+from flask_login import login_required
 from werkzeug.utils import secure_filename
 
 from app import get_index_manager, get_rag_engine
+from app.auth import role_required
 from app.rag_engine import is_scanned_pdf
 
 # Magic-byte signatures for allowed file types
@@ -67,6 +69,7 @@ def _run_index_in_background() -> None:
 # ------------------------------------------------------------------
 
 @documents_bp.get("/documents")
+@login_required
 def list_documents():
     cfg = current_app.config["RAG_CONFIG"]
     docs = _get_document_list(cfg.docs_dir, cfg.allowed_extensions)
@@ -79,6 +82,7 @@ def index_status():
 
 
 @documents_bp.delete("/documents/<filename>")
+@role_required("user")
 def delete_document(filename: str):
     cfg = current_app.config["RAG_CONFIG"]
 
@@ -104,6 +108,7 @@ def delete_document(filename: str):
 
 
 @documents_bp.post("/upload")
+@role_required("user")
 def upload():
     cfg = current_app.config["RAG_CONFIG"]
 

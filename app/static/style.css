@@ -1194,3 +1194,45 @@ th.doc-actions { border-bottom: none; }
 .login-guest a:hover {
   text-decoration: underline;
 }
+
+/* Nav user section */
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-left: auto;
+  padding-left: 1rem;
+  font-size: .85rem;
+}
+
+.nav-username {
+  color: var(--text-muted);
+}
+
+.nav-separator {
+  color: var(--text-dim);
+}
+
+.nav-logout {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.nav-logout:hover {
+  text-decoration: underline;
+}
+
+.nav-login-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: .85rem;
+}
+
+.nav-login-link:hover {
+  text-decoration: underline;
+}

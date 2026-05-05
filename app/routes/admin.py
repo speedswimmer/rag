@@ -9,6 +9,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from sqlalchemy import func
 
 from app import get_rag_engine
+from app.auth import role_required
 from app.backup import create_snapshot, get_last_backup
 from app.config import APP_VERSION
 from app.database import db
@@ -22,6 +23,7 @@ admin_bp = Blueprint("admin", __name__)
 
 
 @admin_bp.get("/admin")
+@role_required("admin")
 def admin():
     cfg = current_app.config["RAG_CONFIG"]
     docs = _get_document_list(cfg.docs_dir, cfg.allowed_extensions)
@@ -40,6 +42,7 @@ def admin():
 
 
 @admin_bp.post("/admin/rebuild")
+@role_required("admin")
 def rebuild():
     cfg = current_app.config["RAG_CONFIG"]
     try:
@@ -51,6 +54,7 @@ def rebuild():
 
 
 @admin_bp.post("/admin/backup")
+@role_required("admin")
 def backup():
     cfg = current_app.config["RAG_CONFIG"]
     try:
@@ -62,6 +66,7 @@ def backup():
 
 
 @admin_bp.post("/admin/settings")
+@role_required("admin")
 def save_settings():
     name = (request.json or {}).get("app_name", "").strip()
     if not name:
@@ -73,6 +78,7 @@ def save_settings():
 
 
 @admin_bp.post("/admin/system-prompt")
+@role_required("admin")
 def save_system_prompt_route():
     prompt = (request.json or {}).get("system_prompt", "").strip()
     if not prompt:
