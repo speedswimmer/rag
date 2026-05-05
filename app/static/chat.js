@@ -235,7 +235,7 @@ function appendMessage(role, content, sources, messageId, feedback) {
     wrapper.appendChild(buildSources(sources));
   }
 
-  if (role === 'assistant') {
+  if (role === 'assistant' && messageId) {
     wrapper.appendChild(buildFeedbackRow(messageId, feedback));
   }
 

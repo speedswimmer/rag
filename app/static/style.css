@@ -1009,6 +1009,7 @@ th.doc-actions { border-bottom: none; }
 .feedback-row.rated .feedback-btn {
   cursor: default;
   opacity: 0.15;
+  pointer-events: none;
 }
 
 .feedback-row.rated .feedback-btn.selected {
