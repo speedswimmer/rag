@@ -106,7 +106,6 @@ function renderSidebar(convs) {
     del.title = 'Löschen';
     del.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Unterhaltung löschen?')) return;
       try {
         await apiDelete('/conversations/' + c.id);
         if (currentConversationId === c.id) {
