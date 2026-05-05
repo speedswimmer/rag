@@ -4,7 +4,7 @@ import logging
 import os
 import uuid
 
-from flask import Flask, g, request as flask_request
+from flask import Flask, g, render_template, request as flask_request
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
@@ -152,5 +152,9 @@ def create_app(config: Config | None = None) -> Flask:
     @app.context_processor
     def inject_globals():
         return {"app_name": get_app_name(), "current_user": _current_user}
+
+    @app.errorhandler(403)
+    def forbidden(e):
+        return render_template("403.html"), 403
 
     return app
