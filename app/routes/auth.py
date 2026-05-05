@@ -5,7 +5,6 @@ import logging
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
-from app.database import db
 from app.models import User
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ def login_post():
     logger.info("User '%s' logged in (role: %s)", user.username, user.role)
 
     next_page = request.args.get("next")
-    if next_page and next_page.startswith("/"):
+    if next_page and next_page.startswith("/") and not next_page.startswith("//"):
         return redirect(next_page)
     return redirect(url_for("chat.index"))
 
