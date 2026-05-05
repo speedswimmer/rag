@@ -322,7 +322,7 @@ html, body {
 
 .message { display: flex; }
 .message-user { justify-content: flex-end; }
-.message-assistant, .message-system { justify-content: flex-start; }
+.message-assistant, .message-system { justify-content: flex-start; flex-direction: column; align-items: flex-start; }
 
 .message-bubble {
   max-width: 72%;
