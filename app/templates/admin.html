@@ -181,8 +181,8 @@
     <h3 style="font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.6rem">
       Negative Bewertungen (letzte 20)
     </h3>
-    <div class="docs-table-wrapper" style="max-height:320px">
-      <table class="docs-table">
+    <div class="docs-table-wrapper" style="max-height:420px">
+      <table class="docs-table" id="feedbackTable">
         <thead>
           <tr>
             <th>Frage</th>
@@ -192,10 +192,22 @@
         </thead>
         <tbody>
           {% for item in feedback_stats.negatives %}
-          <tr>
-            <td style="font-weight:500;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.question }}</td>
-            <td style="color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.answer }}</td>
+          <tr class="feedback-summary" style="cursor:pointer" data-idx="{{ loop.index0 }}">
+            <td style="font-weight:500;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.question_short }}</td>
+            <td style="color:var(--text-muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.answer_short }}</td>
             <td style="white-space:nowrap;color:var(--text-muted);font-size:.82rem">{{ item.date }}</td>
+          </tr>
+          <tr class="feedback-detail" data-idx="{{ loop.index0 }}" style="display:none">
+            <td colspan="3" style="padding:1rem;background:var(--bg-input);border-radius:0">
+              <div style="margin-bottom:.75rem">
+                <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-bottom:.3rem">Frage</div>
+                <div style="color:var(--text);line-height:1.6;white-space:pre-wrap">{{ item.question_full }}</div>
+              </div>
+              <div>
+                <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);margin-bottom:.3rem">Antwort</div>
+                <div style="color:var(--text-muted);line-height:1.6;white-space:pre-wrap">{{ item.answer_full }}</div>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -468,6 +480,20 @@
       rebuildStatus.textContent = 'Verbindungsfehler';
       rebuildStatus.className = 'upload-status upload-status-error';
       rebuildBtn.disabled = false;
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // Feedback detail toggle
+  // ----------------------------------------------------------------
+  document.getElementById('feedbackTable')?.addEventListener('click', (e) => {
+    const row = e.target.closest('.feedback-summary');
+    if (!row) return;
+    const idx = row.dataset.idx;
+    const detail = document.querySelector('.feedback-detail[data-idx="' + idx + '"]');
+    if (detail) {
+      const visible = detail.style.display !== 'none';
+      detail.style.display = visible ? 'none' : 'table-row';
     }
   });
 </script>

@@ -117,8 +117,10 @@ def _get_feedback_stats() -> dict:
             .first()
         )
         negative_details.append({
-            "question": user_msg.content[:120] if user_msg else "—",
-            "answer": assistant_msg.content[:200],
+            "question_short": user_msg.content[:120] if user_msg else "—",
+            "question_full": user_msg.content if user_msg else "—",
+            "answer_short": assistant_msg.content[:200],
+            "answer_full": assistant_msg.content,
             "date": fb.created_at.strftime("%d.%m.%Y %H:%M"),
         })
 
