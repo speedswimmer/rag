@@ -30,6 +30,7 @@ class EnsembleRetriever(BaseRetriever):
 
     retrievers: list[BaseRetriever]
     weights: list[float]
+    top_k: int = 10
     c: int = 60  # RRF constant
 
     def _get_relevant_documents(
@@ -51,9 +52,9 @@ class EnsembleRetriever(BaseRetriever):
                     scores[key] = 0.0
                 scores[key] += weight / (self.c + rank + 1)
 
-        # Sort by score descending
+        # Sort by score descending, limit to top_k
         sorted_keys = sorted(scores, key=lambda k: scores[k], reverse=True)
-        return [doc_map[k] for k in sorted_keys]
+        return [doc_map[k] for k in sorted_keys[:self.top_k]]
 
 
 def is_scanned_pdf(path: Path) -> bool:
@@ -497,6 +498,7 @@ class RAGEngine:
             self._ensemble_retriever = EnsembleRetriever(
                 retrievers=[vector_retriever, self._bm25_retriever],
                 weights=[vector_w, bm25_w],
+                top_k=self.config.retrieval_k,
             )
             logger.info("Ensemble retriever built (vector=%.0f%%, bm25=%.0f%%)",
                         vector_w * 100, bm25_w * 100)
