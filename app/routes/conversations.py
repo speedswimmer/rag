@@ -4,6 +4,7 @@ import json
 import logging
 
 from flask import Blueprint, g, jsonify, request
+from sqlalchemy.orm import joinedload
 
 from app.database import db
 from app.models import Conversation, Message
@@ -68,6 +69,7 @@ def get_messages(conversation_id):
     msgs = (
         Message.query
         .filter_by(conversation_id=conversation_id)
+        .options(joinedload(Message.feedback))
         .order_by(Message.created_at)
         .all()
     )
@@ -77,6 +79,7 @@ def get_messages(conversation_id):
             "role": m.role,
             "content": m.content,
             "sources": json.loads(m.sources) if m.sources else None,
+            "feedback": m.feedback.rating if m.feedback else None,
             "created_at": m.created_at.isoformat(),
         }
         for m in msgs
