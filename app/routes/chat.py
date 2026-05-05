@@ -139,7 +139,25 @@ def submit_feedback(message_id: int):
     if msg.feedback:
         return jsonify({"error": "Bereits bewertet"}), 409
 
-    feedback = Feedback(message_id=message_id, rating=rating)
+    # Find the preceding user message (the question)
+    user_msg = (
+        Message.query
+        .filter(
+            Message.conversation_id == msg.conversation_id,
+            Message.role == "user",
+            Message.created_at < msg.created_at,
+        )
+        .order_by(Message.created_at.desc())
+        .first()
+    )
+
+    feedback = Feedback(
+        message_id=message_id,
+        rating=rating,
+        question=user_msg.content if user_msg else None,
+        answer=msg.content,
+        sources=msg.sources,
+    )
     db.session.add(feedback)
     db.session.commit()
 

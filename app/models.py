@@ -94,11 +94,14 @@ class Feedback(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     message_id = db.Column(
-        db.Integer, db.ForeignKey("messages.id", ondelete="CASCADE"),
-        nullable=False, unique=True, index=True
+        db.Integer, db.ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True, unique=True, index=True
     )
     rating = db.Column(db.String(4), nullable=False)  # 'up' or 'down'
     comment = db.Column(db.Text, nullable=True)
+    question = db.Column(db.Text, nullable=True)
+    answer = db.Column(db.Text, nullable=True)
+    sources = db.Column(db.Text, nullable=True)  # JSON string
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
     message = db.relationship("Message", back_populates="feedback")

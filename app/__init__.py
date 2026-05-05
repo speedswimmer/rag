@@ -39,6 +39,39 @@ def get_index_manager() -> IndexManager:
     return _index_manager
 
 
+def _migrate_feedback_table(app: Flask) -> None:
+    """Add question/answer/sources columns to feedback table if missing."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    existing = {col["name"] for col in inspector.get_columns("feedback")}
+    new_cols = {"question": "TEXT", "answer": "TEXT", "sources": "TEXT"}
+    with db.engine.begin() as conn:
+        for col, dtype in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE feedback ADD COLUMN {col} {dtype}"))
+                app.logger.info("Migration: feedback.%s column added", col)
+        # Backfill existing feedbacks that have a linked message
+        if new_cols.keys() - existing:
+            conn.execute(text("""
+                UPDATE feedback SET
+                    answer = (SELECT m.content FROM messages m WHERE m.id = feedback.message_id),
+                    sources = (SELECT m.sources FROM messages m WHERE m.id = feedback.message_id),
+                    question = (
+                        SELECT u.content FROM messages u
+                        WHERE u.conversation_id = (
+                            SELECT m2.conversation_id FROM messages m2 WHERE m2.id = feedback.message_id
+                        )
+                        AND u.role = 'user'
+                        AND u.created_at < (
+                            SELECT m3.created_at FROM messages m3 WHERE m3.id = feedback.message_id
+                        )
+                        ORDER BY u.created_at DESC LIMIT 1
+                    )
+                WHERE feedback.message_id IS NOT NULL AND feedback.answer IS NULL
+            """))
+            app.logger.info("Migration: existing feedbacks backfilled")
+
+
 def create_app(config: Config | None = None) -> Flask:
     global _rag_engine, _index_manager
 
@@ -70,6 +103,7 @@ def create_app(config: Config | None = None) -> Flask:
     with app.app_context():
         from app import models  # noqa: F401 — registers models with SQLAlchemy
         db.create_all()
+        _migrate_feedback_table(app)
 
         from app.models import User
         if not User.query.filter_by(role="admin").first():

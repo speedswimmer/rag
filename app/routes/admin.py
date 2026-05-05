@@ -13,7 +13,7 @@ from app.auth import role_required
 from app.backup import create_snapshot, get_last_backup
 from app.config import APP_VERSION
 from app.database import db
-from app.models import Feedback, Message
+from app.models import Feedback
 from app.routes.documents import _get_document_list, _run_index_in_background
 from app.settings import get_app_name, get_system_prompt, save_app_name, save_system_prompt
 
@@ -99,10 +99,9 @@ def _get_feedback_stats() -> dict:
     total_up = counts.get("up", 0)
     total_down = counts.get("down", 0)
 
-    # Load recent negative feedbacks with the question that triggered them
+    # Load recent negative feedbacks — data is stored directly on Feedback
     negatives = (
-        db.session.query(Feedback, Message)
-        .join(Message, Feedback.message_id == Message.id)
+        Feedback.query
         .filter(Feedback.rating == "down")
         .order_by(Feedback.created_at.desc())
         .limit(20)
@@ -110,23 +109,14 @@ def _get_feedback_stats() -> dict:
     )
 
     negative_details = []
-    for fb, assistant_msg in negatives:
-        # Find the preceding user message in the same conversation
-        user_msg = (
-            Message.query
-            .filter(
-                Message.conversation_id == assistant_msg.conversation_id,
-                Message.role == "user",
-                Message.created_at < assistant_msg.created_at,
-            )
-            .order_by(Message.created_at.desc())
-            .first()
-        )
+    for fb in negatives:
+        question = fb.question or "—"
+        answer = fb.answer or "—"
         negative_details.append({
-            "question_short": user_msg.content[:120] if user_msg else "—",
-            "question_full": user_msg.content if user_msg else "—",
-            "answer_short": assistant_msg.content[:200],
-            "answer_full": assistant_msg.content,
+            "question_short": question[:120],
+            "question_full": question,
+            "answer_short": answer[:200],
+            "answer_full": answer,
             "date": fb.created_at.strftime("%d.%m.%Y %H:%M"),
         })
 
