@@ -50,7 +50,7 @@ class Config:
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
     )
     llm_model: str = field(
-        default_factory=lambda: os.getenv("LLM_MODEL", "claude-sonnet-4-6")
+        default_factory=lambda: os.getenv("LLM_MODEL", "claude-sonnet-5-5")
     )
 
     # Flask
@@ -68,8 +68,10 @@ class Config:
     chunk_size: int = 1000
     chunk_overlap: int = 200
     retrieval_k: int = 10
-    llm_max_tokens: int = 2048
-    llm_temperature: float = 0.3
+    llm_max_tokens: int = 16000  # thinking counts toward this limit
+    llm_effort: str = field(
+        default_factory=lambda: os.getenv("LLM_EFFORT", "low")
+    )
     bm25_weight: float = field(
         default_factory=lambda: float(os.getenv("BM25_WEIGHT", "0.5"))
     )

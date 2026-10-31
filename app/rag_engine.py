@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Models that accept the server-side refusal fallback in its "default" form
+_SERVER_FALLBACK_MODELS = {"claude-sonnet-5-5"}
+_REFUSAL_MESSAGE = "Diese Anfrage wurde vom KI-Modell abgelehnt. Bitte formuliere die Frage um."
+
 
 class EnsembleRetriever(BaseRetriever):
     """Combine multiple retrievers via Reciprocal Rank Fusion (RRF)."""
@@ -229,7 +233,8 @@ class RAGEngine:
                 "page": doc.metadata.get("page", "?"),
             })
 
-        return {"answer": result["result"], "sources": sources}
+        # A refused request comes back without any text
+        return {"answer": result["result"] or _REFUSAL_MESSAGE, "sources": sources}
 
     # ------------------------------------------------------------------
     # Streaming query
@@ -261,13 +266,10 @@ class RAGEngine:
         )
 
         try:
-            llm = ChatAnthropic(
-                model=self.config.llm_model,
-                max_tokens=256,
-                temperature=0.0,
-            )
+            llm = self._create_llm(max_tokens=1024)
             result = llm.invoke(condense_prompt)
-            condensed = result.content.strip()
+            # .text skips thinking blocks; .content can be a list of blocks
+            condensed = result.text.strip()
             if condensed:
                 logger.info("Condensed question: '%s' -> '%s'", question[:60], condensed[:60])
                 return condensed
@@ -326,11 +328,7 @@ class RAGEngine:
         messages = [("system", get_system_prompt()), ("human", prompt_text)]
 
         # 6. Stream LLM response with retry on overload
-        llm = ChatAnthropic(
-            model=self.config.llm_model,
-            max_tokens=self.config.llm_max_tokens,
-            temperature=self.config.llm_temperature,
-        )
+        llm = self._create_llm(max_tokens=self.config.llm_max_tokens)
 
         last_exc: Exception | None = None
         for attempt, delay in enumerate([0, 5, 15]):
@@ -338,10 +336,17 @@ class RAGEngine:
                 logger.info("Retrying stream after %ds (attempt %d/3) …", delay, attempt + 1)
                 time.sleep(delay)
             try:
+                stop_reason = None
                 for chunk in llm.stream(messages):
-                    token = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    stop_reason = chunk.response_metadata.get("stop_reason") or stop_reason
+                    # .text skips thinking blocks; .content can be a list of blocks
+                    token = chunk.text
                     if token:
                         yield {"type": "token", "data": token}
+                if stop_reason == "refusal":
+                    logger.warning("Model refused the request")
+                    yield {"type": "error", "data": _REFUSAL_MESSAGE}
+                    return
                 yield {"type": "done"}
                 return
             except Exception as exc:
@@ -357,6 +362,24 @@ class RAGEngine:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _create_llm(self, max_tokens: int) -> ChatAnthropic:
+        """Build the chat model; thinking depth is controlled via effort."""
+        fallback_kwargs = {}
+        if self.config.llm_model in _SERVER_FALLBACK_MODELS:
+            fallback_kwargs = {
+                "betas": ["server-side-fallback-2026-07-01"],
+                "model_kwargs": {"fallbacks": "default"},
+            }
+        return ChatAnthropic(
+            model=self.config.llm_model,
+            max_tokens=max_tokens,
+            # output_config instead of reasoning_effort: the latter makes
+            # LangChain request thinking summaries that nobody reads here
+            output_config={"effort": self.config.llm_effort},
+            **fallback_kwargs,
+        )
+
 
     def _try_load_existing_index(self) -> None:
         """Try to open ChromaDB from disk if it was populated after startup."""
@@ -508,11 +531,7 @@ class RAGEngine:
 
     def _build_chain(self) -> None:
         self._build_ensemble()
-        llm = ChatAnthropic(
-            model=self.config.llm_model,
-            max_tokens=self.config.llm_max_tokens,
-            temperature=self.config.llm_temperature,
-        )
+        llm = self._create_llm(max_tokens=self.config.llm_max_tokens)
         retriever = self._ensemble_retriever or self._vectorstore.as_retriever(
             search_kwargs={"k": self.config.retrieval_k}
         )

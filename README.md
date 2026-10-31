@@ -81,7 +81,8 @@ All settings live in `.env`. The defaults work out of the box — only `ANTHROPI
 | `ANTHROPIC_API_KEY` | — | **Required.** Your Anthropic API key |
 | `SECRET_KEY` | — | **Required.** Random string for Flask session signing |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Local sentence-transformer model (~80 MB, downloaded on first run) |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | Claude model used for answer generation |
+| `LLM_MODEL` | `claude-sonnet-5-5` | Claude model used for answer generation |
+| `LLM_EFFORT` | `low` | Thinking depth of the model (`low`, `medium`, `high`, `xhigh`, `max`) |
 
 ## Architecture
 

@@ -11,35 +11,41 @@ export ANTHROPIC_API_KEY='your-key'
 
 Install dependencies:
 ```bash
-pip install langchain langchain-anthropic langchain-community langchain-text-splitters langchain-classic chromadb sentence-transformers pypdf
+pip install -r requirements.txt
 ```
 
 ## Running
 
 ```bash
-python rag_demo.py
-```
+# Local development
+python wsgi.py
 
-Place `.pdf` or `.txt` files into `./dokumente/` before starting. The script will exit if no documents are found.
+# Production (Pi)
+gunicorn wsgi:app
+```
 
 ## Architecture
 
-Single-file RAG pipeline (`rag_demo.py`) with these stages:
+Flask web application with RAG pipeline (`app/rag_engine.py`):
 
-1. **Document loading** - Loads PDFs and TXT files from `./dokumente/` via LangChain `DirectoryLoader`
-2. **Chunking** - Splits text into 1000-char chunks with 200-char overlap via `RecursiveCharacterTextSplitter`
-3. **Embedding** - Uses `all-MiniLM-L6-v2` (HuggingFace, ~80MB, CPU-only) to embed chunks
-4. **Vector store** - Persists embeddings in ChromaDB at `./chroma_db/`
-5. **Retrieval + Generation** - `RetrievalQA` chain retrieves top-3 chunks and passes them to `claude-sonnet-4-20250514` via the Anthropic API
-6. **Interactive loop** - REPL that accepts questions, prints answers and source citations
+1. **Document loading** - PDF, DOCX, TXT, MD from `./dokumente/` with OCR fallback for scanned PDFs
+2. **Chunking** - `RecursiveCharacterTextSplitter` (1000 chars, 200 overlap)
+3. **Embedding** - `paraphrase-multilingual-MiniLM-L12-v2` (HuggingFace, CPU)
+4. **Vector store** - ChromaDB at `./chroma_db/` with smart indexing (SHA-256 + mtime)
+5. **Hybrid retrieval** - Ensemble of semantic vector search + BM25 keyword search with RRF fusion, configurable weight via `BM25_WEIGHT` env var (default 0.5)
+6. **Generation** - `claude-sonnet-5-5` via Anthropic API, streaming responses
+7. **Conversation context** - Condense-question pattern for follow-up questions
 
-The vector store is rebuilt from scratch on every run (no incremental update logic). The embedding model is downloaded on first run.
+App factory in `app/__init__.py`, config dataclass in `app/config.py`, routes in `app/routes/`.
 
-## Key Config Constants
+## Key Config (env vars / .env)
 
-| Constant | Value | Purpose |
+| Variable | Default | Purpose |
 |---|---|---|
-| `DOCS_DIR` | `./dokumente` | Source document folder |
-| `CHROMA_DIR` | `./chroma_db` | Vector DB persistence path |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Local sentence-transformer model |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | Claude model for generation |
+| `ANTHROPIC_API_KEY` | — | Required for LLM calls |
+| `LLM_MODEL` | `claude-sonnet-5-5` | Claude model for generation |
+| `LLM_EFFORT` | `low` | Thinking depth of the model (`low` to `max`) |
+| `EMBEDDING_MODEL` | `paraphrase-multilingual-MiniLM-L12-v2` | Local embedding model |
+| `BM25_WEIGHT` | `0.5` | BM25 weight in hybrid search (0.0 = vector only, 1.0 = BM25 only) |
+| `CONTEXT_MESSAGES` | `5` | Number of history messages for condense-question |
+| `SECRET_KEY` | `change-me-in-production` | Flask session secret |
